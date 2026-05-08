@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,21 @@ func TestHelloServerUsesFirstRepeatedTextInjection(t *testing.T) {
 	res := serveHello(t, "/?textInjection=first&textInjection=second")
 
 	assertBody(t, res, "Hello, 127.0.0.1:1234! I'm local first\n")
+}
+
+func TestHelloServerTruncatesLongTextInjection(t *testing.T) {
+	t.Setenv("HOSTNAME", "local")
+	textInjection := strings.Repeat("a", maxTextInjectionBytes+1)
+
+	res := serveHello(t, "/?textInjection="+textInjection)
+
+	assertBody(t, res, "Hello, 127.0.0.1:1234! I'm local "+strings.Repeat("a", maxTextInjectionBytes)+"\n")
+}
+
+func TestTruncateStringBytesKeepsRuneBoundary(t *testing.T) {
+	if got, want := truncateStringBytes("éé", 3), "é"; got != want {
+		t.Fatalf("truncateStringBytes() = %q, want %q", got, want)
+	}
 }
 
 func serveHello(t *testing.T, target string) *http.Response {

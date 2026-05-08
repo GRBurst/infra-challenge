@@ -52,7 +52,8 @@ curl 'http://localhost:8080/?textInjection=welcome'
 Missing or empty `textInjection` values leave the default greeting unchanged.
 The response is served as `text/plain; charset=utf-8` with
 `X-Content-Type-Options: nosniff`, so injected text is rendered as text rather
-than interpreted as HTML.
+than interpreted as HTML. The value is capped at 256 bytes to reduce response
+and log amplification risk from very large requests.
 
 `HELLO_TAG` is runtime configuration. Set it in the shell, container runtime,
 Kubernetes deployment, or CI/CD environment that starts the service.

@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+const maxTextInjectionBytes = 256
+
 func main() {
 	fmt.Println("Hivemind's Go Greeter")
 	fmt.Println("You are running the service with this tag: ", os.Getenv("HELLO_TAG"))
@@ -19,6 +21,8 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 		// textInjection is untrusted URL input. It is appended only to a
 		// text/plain response, with nosniff set, so browsers render it as text
 		// instead of executing markup.
+		// Limit its size to reduce response and log amplification risk.
+		textInjection = truncateStringBytes(textInjection, maxTextInjectionBytes)
 		fmtStr = fmt.Sprintf("%s %s", fmtStr, textInjection)
 	}
 
@@ -34,4 +38,26 @@ func GetIPFromRequest(r *http.Request) string {
 	}
 
 	return r.RemoteAddr
+}
+
+func truncateStringBytes(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+
+	prev := 0
+	for i := range s {
+		if i == maxBytes {
+			return s[:i]
+		}
+		if i > maxBytes {
+			return s[:prev]
+		}
+		prev = i
+	}
+
+	return s[:prev]
 }
