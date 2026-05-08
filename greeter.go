@@ -15,6 +15,15 @@ func main() {
 
 func HelloServer(w http.ResponseWriter, r *http.Request) {
 	fmtStr := fmt.Sprintf("Hello, %s! I'm %s", GetIPFromRequest(r), os.Getenv("HOSTNAME"))
+	if textInjection := r.URL.Query().Get("textInjection"); textInjection != "" {
+		// textInjection is untrusted URL input. It is appended only to a
+		// text/plain response, with nosniff set, so browsers render it as text
+		// instead of executing markup.
+		fmtStr = fmt.Sprintf("%s %s", fmtStr, textInjection)
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	fmt.Println(fmtStr)
 	fmt.Fprintln(w, fmtStr)
 }

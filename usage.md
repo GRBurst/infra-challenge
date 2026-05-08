@@ -43,6 +43,17 @@ The service listens on port `8080`. In another terminal, verify it responds:
 curl http://localhost:8080/
 ```
 
+You can append text to the greeting with the `textInjection` query parameter:
+
+```shell
+curl 'http://localhost:8080/?textInjection=welcome'
+```
+
+Missing or empty `textInjection` values leave the default greeting unchanged.
+The response is served as `text/plain; charset=utf-8` with
+`X-Content-Type-Options: nosniff`, so injected text is rendered as text rather
+than interpreted as HTML.
+
 `HELLO_TAG` is runtime configuration. Set it in the shell, container runtime,
 Kubernetes deployment, or CI/CD environment that starts the service.
 
@@ -85,6 +96,12 @@ Verify it responds:
 
 ```shell
 curl http://localhost:8080/
+```
+
+The same query parameter works when running the Docker image:
+
+```shell
+curl 'http://localhost:8080/?textInjection=welcome'
 ```
 
 ## Verify The Flake
