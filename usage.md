@@ -114,3 +114,28 @@ nix flake check
 ```
 
 The checks build both the greeter binary and the Docker image.
+
+## Development Shell
+
+Enter the dev shell to get all project tools on PATH (opentofu, just, treefmt,
+yamlfmt, mdformat, yamllint, tflint, trivy, pre-commit):
+
+```shell
+nix develop
+```
+
+Install the git hooks once after entering the shell:
+
+```shell
+pre-commit install
+```
+
+Common tasks via `just`:
+
+```shell
+just fmt        # format all (tofu, nix, yaml, markdown)
+just lint       # lint all (core + yaml)
+just tflint     # run TFLint with AWS ruleset
+just validate   # validate all environments
+just check      # full CI equivalent
+```

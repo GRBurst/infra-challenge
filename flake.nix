@@ -71,5 +71,20 @@
       checks.${system} = {
         inherit greeter dockerImage;
       };
+
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [
+          opentofu
+          just
+          pre-commit
+          treefmt
+          nixfmt-rfc-style
+          yamlfmt
+          mdformat
+          yamllint
+          tflint
+          trivy
+        ];
+      };
     };
 }

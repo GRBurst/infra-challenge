@@ -1,0 +1,33 @@
+repos:
+  - repo: local
+    hooks:
+      - id: fmt
+        name: "Format: tofu, nix, yaml, markdown"
+        entry: just fmt
+        language: system
+        pass_filenames: false
+      - id: lint-yaml
+        name: "Lint: YAML"
+        entry: just lint-yaml
+        language: system
+        pass_filenames: false
+      - id: tflint
+        name: "Lint: TFLint"
+        entry: just tflint
+        language: system
+        pass_filenames: false
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+        name: "Core: Fix end of files"
+      - id: trailing-whitespace
+        name: "Core: Trim trailing whitespace"
+        exclude: snap_test.*\.py
+      - id: check-merge-conflict
+        name: "Core: Check for merge conflicts"
+      - id: mixed-line-ending
+        name: "Core: Force LF line endings"
+        args: [--fix=lf]
+      - id: detect-private-key
+        name: "Core: Detect private keys"

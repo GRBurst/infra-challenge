@@ -4,16 +4,16 @@ Welcome to Hivemind's Infrastructure Challenge! This project is a coding challen
 
 **Here is what we would like you to do:**
 
-* Deploy a web service to AWS using Terraform.
-* Set the HELLO_TAG environment variable to a unique value.
-* Add a URL parameter to the greeter.
+- Deploy a web service to AWS using Terraform.
+- Set the HELLO_TAG environment variable to a unique value.
+- Add a URL parameter to the greeter.
 
 **To complete the challenge, you will also need to:**
 
-* Build a pipeline for continuous integration and deployment.
-* Create documentation that explains how to set up and use the service.
-* Ensure that your solution is production-ready by implementing best practices for security, performance, and reliability.
-* Submit your solution by sending us a zip file via email.
+- Build a pipeline for continuous integration and deployment.
+- Create documentation that explains how to set up and use the service.
+- Ensure that your solution is production-ready by implementing best practices for security, performance, and reliability.
+- Submit your solution by sending us a zip file via email.
 
 It's important to note that while we expect the solution to be production-ready, we understand that there may be certain limitations or constraints based on the environment in which the solution is deployed. If there are any areas of production readiness that you are unable to achieve due to environmental limitations, please provide an explanation in your documentation of how you would typically address those concerns in a production environment.
 
