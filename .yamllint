@@ -1,0 +1,12 @@
+extends: default
+
+rules:
+  # Disable line length checks (useful for long K8s image URLs or CI scripts)
+  line-length: disable
+  document-start: disable
+  # Enforce consistent indentation
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+ignore-from-file: [.gitignore]

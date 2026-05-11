@@ -2,7 +2,7 @@
   description = "Hivemind infrastructure challenge greeter";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs =
@@ -74,6 +74,7 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
+          awscli2
           opentofu
           just
           pre-commit
