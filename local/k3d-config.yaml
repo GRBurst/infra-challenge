@@ -14,6 +14,9 @@ ports:
   - port: 8081:80
     nodeFilters:
       - loadbalancer
+  - port: 3000:30080
+    nodeFilters:
+      - server:0
 options:
   k3d:
     wait: true

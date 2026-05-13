@@ -1,0 +1,45 @@
+# Local dev only. Public, ephemeral, SQLite. NodePort for host access.
+gitea:
+  admin:
+    username: gitea-admin
+    password: gitea-admin
+    email: gitea-admin@gitea.local
+  config:
+    database:
+      DB_TYPE: sqlite3
+    server:
+      DOMAIN: localhost
+      HTTP_PORT: "3000"
+      ROOT_URL: http://localhost:3000/
+      SSH_DOMAIN: localhost
+      DISABLE_SSH: "true"
+    repository:
+      DEFAULT_BRANCH: main
+    service:
+      DISABLE_REGISTRATION: "true"
+    security:
+      INSTALL_LOCK: "true"
+  metrics:
+    enabled: false
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: local-path
+service:
+  http:
+    type: NodePort
+    port: 3000
+    nodePort: 30080
+  ssh:
+    type: ClusterIP
+ingress:
+  enabled: false
+# Sub-chart deps disabled — SQLite covers DB needs.
+postgresql-ha:
+  enabled: false
+postgresql:
+  enabled: false
+redis-cluster:
+  enabled: false
+redis:
+  enabled: false

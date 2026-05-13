@@ -39,3 +39,40 @@ run "invalid_environment_rejected" {
   }
   expect_failures = [var.environment]
 }
+
+run "custom_repo_url_flows_to_application_and_appproject" {
+  command = plan
+  variables {
+    environment      = "local"
+    greeter_repo_url = "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
+  }
+  assert {
+    condition = strcontains(
+      jsonencode(kubernetes_manifest.application.manifest),
+      "gitea-http.gitea.svc.cluster.local"
+    )
+    error_message = "Application.spec.source.repoURL must use override."
+  }
+  assert {
+    condition = strcontains(
+      jsonencode(kubernetes_manifest.appproject.manifest),
+      "gitea-http.gitea.svc.cluster.local"
+    )
+    error_message = "AppProject.spec.sourceRepos must use override."
+  }
+}
+
+run "custom_target_revision_flows_to_application" {
+  command = plan
+  variables {
+    environment             = "local"
+    greeter_target_revision = "feature/demo-x"
+  }
+  assert {
+    condition = strcontains(
+      jsonencode(kubernetes_manifest.application.manifest),
+      "feature/demo-x"
+    )
+    error_message = "Application.spec.source.targetRevision must reflect override."
+  }
+}
