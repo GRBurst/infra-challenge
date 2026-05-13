@@ -1,0 +1,10 @@
+image:
+  repository: registry.localhost:5001/greeter
+  tag: local
+  pullPolicy: IfNotPresent
+helloTag: "local-dev"
+buildTime: ""
+hpa:
+  enabled: false
+pdb:
+  enabled: false

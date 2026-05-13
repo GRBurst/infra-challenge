@@ -9,4 +9,4 @@ rules:
     spaces: 2
     indent-sequences: true
 
-ignore-from-file: [.gitignore]
+ignore-from-file: [.gitignore, .yamllintignore]

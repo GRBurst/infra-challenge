@@ -1,0 +1,14 @@
+suite: hpa
+templates:
+  - hpa.yaml
+tests:
+  - it: HPA is enabled by default
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+  - it: HPA is disabled in local values
+    values:
+      - ../values-local.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

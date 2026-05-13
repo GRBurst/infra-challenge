@@ -85,7 +85,20 @@
           yamllint
           tflint
           trivy
+          k3d
+          kubectl
+          kubernetes-helm
+          kubeconform
+          go
+          jq
+          bash
         ];
+
+        shellHook = ''
+          if ! helm plugin list 2>/dev/null | grep -q unittest; then
+            helm plugin install https://github.com/helm-unittest/helm-unittest >/dev/null 2>&1 || true
+          fi
+        '';
       };
     };
 }

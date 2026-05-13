@@ -1,0 +1,8 @@
+Greeter has been deployed.
+
+  Service: {{ include "greeter.fullname" . }}
+  Namespace: {{ .Release.Namespace }}
+
+Access the service:
+  kubectl port-forward svc/{{ include "greeter.fullname" . }} 8080:8080 -n {{ .Release.Namespace }}
+  curl http://localhost:8080/healthz

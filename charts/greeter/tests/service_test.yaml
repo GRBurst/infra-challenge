@@ -1,0 +1,17 @@
+suite: service
+templates:
+  - service.yaml
+tests:
+  - it: creates a ClusterIP service
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+  - it: targets port 8080
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            port: 8080
+            targetPort: http
+            protocol: TCP

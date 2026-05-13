@@ -1,0 +1,8 @@
+image:
+  repository: ""
+  tag: ""
+helloTag: ""
+buildTime: ""
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: ""

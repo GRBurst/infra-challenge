@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -71,6 +72,47 @@ func serveHello(t *testing.T, target string) *http.Response {
 	HelloServer(rec, req)
 
 	return rec.Result()
+}
+
+func TestHealthzReturns200(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	HealthzHandler(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestVersionReturnsJSON(t *testing.T) {
+	t.Setenv("HELLO_TAG", "abc123")
+	t.Setenv("BUILD_TIME", "2026-05-13T10:00:00Z")
+	t.Setenv("HOSTNAME", "pod-xyz")
+	req := httptest.NewRequest(http.MethodGet, "/version", nil)
+	rec := httptest.NewRecorder()
+	VersionHandler(rec, req)
+
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("Content-Type = %q, want application/json…", ct)
+	}
+	var got struct {
+		HelloTag, BuildTime, Hostname string
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.HelloTag != "abc123" || got.BuildTime != "2026-05-13T10:00:00Z" || got.Hostname != "pod-xyz" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestHelloServerSetsXHelloTagHeader(t *testing.T) {
+	t.Setenv("HELLO_TAG", "abc123")
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	HelloServer(rec, req)
+	if got := rec.Header().Get("X-Hello-Tag"); got != "abc123" {
+		t.Fatalf("X-Hello-Tag = %q, want abc123", got)
+	}
 }
 
 func assertBody(t *testing.T, res *http.Response, want string) {

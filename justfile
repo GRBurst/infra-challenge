@@ -34,11 +34,11 @@ fmt-nix:
 
 # Check: YAML formatting
 fmt-yaml-check:
-  yamlfmt -gitignore_excludes -exclude 'refs/**/*' -lint -dstar '**/*.{yml,yaml}'
+  yamlfmt -gitignore_excludes -exclude 'refs/**/*' -exclude 'charts/greeter/templates/**' -lint -dstar '**/*.{yml,yaml}'
 
 # Fix: YAML formatting
 fmt-yaml:
-  yamlfmt -gitignore_excludes -exclude 'refs/**/*' -dstar '**/*.{yml,yaml}'
+  yamlfmt -gitignore_excludes -exclude 'refs/**/*' -exclude 'charts/greeter/templates/**' -dstar '**/*.{yml,yaml}'
 
 # Check: Markdown formatting
 fmt-md-check:
@@ -172,6 +172,63 @@ test:
     echo "--- Testing $dir ---"
     (cd "$dir" && tofu init -backend=false -input=false -no-color && tofu test -no-color)
   done < <(find modules -name '*.tftest.hcl' -exec dirname {} \; | sort -u)
+
+# Run Go tests
+test-go:
+  GO111MODULE=off go test -v
+
+# Run Helm lint and unit tests
+test-chart:
+  helm lint charts/greeter
+  helm unittest charts/greeter
+
+# Run OpenTofu tests for gitops module and local env
+test-tofu:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "--- Testing modules/gitops ---"
+  (cd modules/gitops && tofu init -backend=false -input=false -no-color && tofu test -no-color)
+  echo "--- Testing envs/local ---"
+  (cd envs/local && tofu init -backend=false -input=false -no-color && tofu test -no-color)
+
+# Run all tests: Go, Helm, and OpenTofu
+test-all: test-go test-chart test-tofu
+
+# ============================================================
+# Local dev lifecycle
+# ============================================================
+
+# Bring up local k3d cluster, push image, apply GitOps stack
+dev-up:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if ! k3d cluster list | grep -q infra-challenge; then
+    k3d cluster create --config local/k3d-config.yaml
+  fi
+  just dev-image
+  cd envs/local && tofu init && tofu apply -auto-approve
+
+# Build and push greeter image to local registry
+dev-image:
+  nix build .#dockerImage
+  docker load < result
+  docker tag greeter:latest registry.localhost:5001/greeter:local
+  docker push registry.localhost:5001/greeter:local
+
+# Install/upgrade greeter chart directly (without ArgoCD sync)
+dev-deploy:
+  helm upgrade --install greeter charts/greeter \
+    -f charts/greeter/values-local.yaml \
+    -n greeter --create-namespace \
+    --kube-context k3d-infra-challenge
+
+# Run smoke tests against local cluster
+dev-test:
+  bash local/scripts/smoke-test.sh
+
+# Tear down local k3d cluster
+dev-down:
+  k3d cluster delete infra-challenge
 
 # ============================================================
 # Aggregated
