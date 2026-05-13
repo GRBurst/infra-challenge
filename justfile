@@ -206,7 +206,9 @@ dev-up:
     k3d cluster create --config local/k3d-config.yaml
   fi
   just dev-image
-  cd envs/local && tofu init && tofu apply -auto-approve
+  cd envs/local && tofu init \
+    && tofu apply -target=module.gitops.helm_release.argocd -auto-approve \
+    && tofu apply -auto-approve
 
 # Build and push greeter image to local registry
 dev-image:
