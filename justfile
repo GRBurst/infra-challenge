@@ -204,7 +204,10 @@ dev-up:
   set -euo pipefail
   if ! k3d cluster list | grep -q infra-challenge; then
     k3d cluster create --config local/k3d-config.yaml
+  else
+    k3d cluster start infra-challenge 2>/dev/null || true
   fi
+  until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
   just dev-image
   cd envs/local && tofu init \
     && tofu apply -target=module.gitops.helm_release.argocd -auto-approve \
