@@ -24,7 +24,7 @@ variable "greeter_target_revision" {
 
 variable "argocd_chart_version" {
   type    = string
-  default = "7.7.0"
+  default = "9.5.14"
 }
 
 variable "argocd_namespace" {
