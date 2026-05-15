@@ -45,7 +45,7 @@ fmt-md-check:
   #!/usr/bin/env bash
   set -euo pipefail
   git ls-files -z -- '*.md' ':(exclude)refs/**' \
-    | xargs -0 --no-run-if-empty mdformat --check
+    | xargs -0 --no-run-if-empty mdformat --number --check
 
 # Fix: Markdown formatting
 fmt-md:
@@ -254,17 +254,17 @@ dev-up-gitea:
   fi
   until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
   just dev-image
-  cd envs/local && \
+  cd "{{repo_root}}/envs/local" && \
     tofu init && \
     tofu apply -auto-approve \
       -var gitea_enabled=true -var "greeter_branch=$branch" \
       -target=helm_release.gitea
   cd "{{repo_root}}" && bash local/scripts/gitea-setup.sh
-  cd envs/local && \
+  cd "{{repo_root}}/envs/local" && \
     tofu apply -auto-approve \
       -var gitea_enabled=true -var "greeter_branch=$branch" \
       -target=module.gitops.helm_release.argocd
-  cd envs/local && \
+  cd "{{repo_root}}/envs/local" && \
     tofu apply -auto-approve \
       -var gitea_enabled=true -var "greeter_branch=$branch"
   echo
