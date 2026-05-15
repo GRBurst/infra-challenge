@@ -62,6 +62,17 @@ run "custom_repo_url_flows_to_application_and_appproject" {
   }
 }
 
+run "appproject_permits_namespace_for_create_namespace_sync_option" {
+  command = plan
+  assert {
+    condition = anytrue([
+      for r in kubernetes_manifest.appproject.manifest.spec.clusterResourceWhitelist :
+      r.group == "" && r.kind == "Namespace"
+    ])
+    error_message = "AppProject.clusterResourceWhitelist must include Namespace so CreateNamespace=true can create the greeter namespace at PreSync."
+  }
+}
+
 run "custom_target_revision_flows_to_application" {
   command = plan
   variables {

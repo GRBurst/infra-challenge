@@ -34,7 +34,7 @@ resource "kubernetes_manifest" "appproject" {
         namespace = var.greeter_namespace
         server    = "https://kubernetes.default.svc"
       }]
-      clusterResourceWhitelist   = []
+      clusterResourceWhitelist   = [{ group = "", kind = "Namespace" }]
       namespaceResourceWhitelist = [{ group = "*", kind = "*" }]
     }
   }
