@@ -85,6 +85,7 @@
           yamllint
           tflint
           trivy
+          k9s
           k3d
           kubectl
           kubernetes-helm
