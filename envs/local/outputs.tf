@@ -7,7 +7,12 @@ output "argocd_namespace" {
 }
 
 output "argocd_port_forward_hint" {
-  value = "kubectl --context ${var.kubeconfig_context} port-forward svc/argocd-server -n ${module.gitops.argocd_namespace} 8080:80"
+  value = "kubectl --context ${var.kubeconfig_context} port-forward svc/argocd-server -n ${module.gitops.argocd_namespace} ${var.argocd_host_port}:80"
+}
+
+output "greeter_url" {
+  value       = "http://localhost:${var.greeter_host_port}/"
+  description = "Greeter service via Traefik ingress (mapped by k3d loadbalancer)."
 }
 
 output "argocd_target_revision" {

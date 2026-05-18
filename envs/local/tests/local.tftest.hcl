@@ -70,6 +70,22 @@ run "gitea_web_url_exposes_host_port" {
   }
 }
 
+run "greeter_url_uses_default_host_port" {
+  command = plan
+  assert {
+    condition     = output.greeter_url == "http://localhost:8081/"
+    error_message = "greeter_url must use the default Traefik ingress port (8081)."
+  }
+}
+
+run "argocd_port_forward_hint_uses_argocd_host_port" {
+  command = plan
+  assert {
+    condition     = strcontains(output.argocd_port_forward_hint, "8080:80")
+    error_message = "Port-forward hint must use the default argocd_host_port (8080)."
+  }
+}
+
 run "rejects_empty_branch" {
   command = plan
   variables {

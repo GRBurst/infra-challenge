@@ -22,3 +22,15 @@ variable "gitea_chart_version" {
   description = "Pinned Gitea Helm chart version."
   default     = "11.0.1"
 }
+
+variable "greeter_host_port" {
+  type        = number
+  description = "Host port mapped by k3d loadbalancer to the Traefik ingress (greeter)."
+  default     = 8081
+}
+
+variable "argocd_host_port" {
+  type        = number
+  description = "Local port used in the ArgoCD port-forward hint."
+  default     = 8080
+}

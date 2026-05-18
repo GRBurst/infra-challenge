@@ -203,6 +203,7 @@ test-all: test-go test-chart test-tofu test-gitea-script
 dev-up:
   #!/usr/bin/env bash
   set -euo pipefail
+  CTX="k3d-infra-challenge"
   branch="$(git rev-parse --abbrev-ref HEAD)"
   if [[ "$branch" == "HEAD" ]]; then
     echo "ERROR: detached HEAD; checkout a branch first." >&2; exit 1
@@ -214,18 +215,33 @@ dev-up:
   fi
   until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
   just dev-image
+
+  echo "==> Deploying Gitea..."
   cd "{{repo_root}}/envs/local" && \
     tofu init && \
     tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitea
+  # Assert Gitea is actually healthy before proceeding — fail loudly if not
+  kubectl --context "$CTX" -n gitea rollout status statefulset/gitea --timeout=300s
+  kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
+
+  echo "==> Bootstrapping Gitea repo..."
   cd "{{repo_root}}" && bash envs/local/cluster/scripts/gitea-setup.sh
+
+  echo "==> Deploying ArgoCD..."
   cd "{{repo_root}}/envs/local" && \
     tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitops.helm_release.argocd
+
+  echo "==> Applying Application CR..."
   cd "{{repo_root}}/envs/local" && \
     tofu apply -auto-approve -var "greeter_branch=$branch"
+
   echo
-  echo "Gitea web:  http://localhost:3000  (gitea-admin / gitea-admin)"
-  echo "Branch:     $branch"
-  echo "ArgoCD UI:  just argocd-ui"
+  echo "=== Local stack ready ==="
+  echo "  Greeter:   http://localhost:8081/"
+  echo "  Gitea:     http://localhost:3000  (gitea-admin / gitea-admin)"
+  echo "  ArgoCD:    run 'just argocd-ui' then open http://localhost:8080"
+  echo "  Branch:    $branch"
+  echo "  Check:     just dev-check"
 
 # Build and push greeter image to local registry
 dev-image:
@@ -244,6 +260,29 @@ dev-deploy:
 # Run smoke tests against local cluster
 dev-test:
   bash envs/local/cluster/scripts/smoke-test.sh
+
+# Assert all local components are healthy (Gitea, ArgoCD, greeter)
+dev-check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  CTX="k3d-infra-challenge"
+  echo "--- Gitea ---"
+  kubectl --context "$CTX" -n gitea rollout status statefulset/gitea --timeout=60s
+  kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
+  echo "  gitea-http service: OK"
+  echo "--- ArgoCD ---"
+  kubectl --context "$CTX" -n argocd rollout status deployment/argocd-server --timeout=60s
+  echo "--- Greeter ---"
+  kubectl --context "$CTX" -n greeter rollout status deployment/greeter --timeout=120s
+  echo "--- ArgoCD sync ---"
+  sync_status="$(kubectl --context "$CTX" -n argocd get app greeter \
+    -o jsonpath='{.status.sync.status}' 2>/dev/null || echo 'Unknown')"
+  health_status="$(kubectl --context "$CTX" -n argocd get app greeter \
+    -o jsonpath='{.status.health.status}' 2>/dev/null || echo 'Unknown')"
+  echo "  sync=$sync_status health=$health_status"
+  [[ "$sync_status" == "Synced" ]] || { echo "FAIL: app not Synced"; exit 1; }
+  [[ "$health_status" == "Healthy" ]] || { echo "FAIL: app not Healthy"; exit 1; }
+  echo "All components healthy."
 
 # Tear down local k3d cluster
 dev-down:
