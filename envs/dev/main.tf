@@ -5,7 +5,7 @@ provider "aws" {
 module "bootstrap" {
   source = "../../modules/bootstrap"
 
-  namespace   = "hm" # Replace with your company name
+  namespace   = "hm"
   environment = "dev"
   github_repo = "GRBurst/infra-challenge"
 }
