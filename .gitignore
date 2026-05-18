@@ -1,4 +1,5 @@
 .direnv
+.debug
 .terraform
 .terraform/
 terraform.tfstate
