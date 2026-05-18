@@ -164,14 +164,15 @@ security:
 # Test
 # ============================================================
 
-# Run OpenTofu native tests for all modules that have test files
+# Run OpenTofu native tests for every module/env that has tests/*.tftest.hcl
 test:
   #!/usr/bin/env bash
   set -euo pipefail
-  while IFS= read -r dir; do
-    echo "--- Testing $dir ---"
-    (cd "$dir" && tofu init -backend=false -input=false -no-color && tofu test -no-color)
-  done < <(find modules -name '*.tftest.hcl' -exec dirname {} \; | sort -u)
+  while IFS= read -r tests_dir; do
+    module_dir=$(dirname "$tests_dir")
+    echo "--- Testing $module_dir ---"
+    (cd "$module_dir" && tofu init -backend=false -input=false -no-color && tofu test -no-color)
+  done < <(find modules envs -type d -name tests | sort -u)
 
 # Run Go tests
 test-go:
@@ -198,20 +199,33 @@ test-all: test-go test-chart test-tofu test-gitea-script
 # Local dev lifecycle
 # ============================================================
 
-# Bring up local k3d cluster, push image, apply GitOps stack
+# Bring up local k3d cluster (with Gitea + ArgoCD tracking current branch)
 dev-up:
   #!/usr/bin/env bash
   set -euo pipefail
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [[ "$branch" == "HEAD" ]]; then
+    echo "ERROR: detached HEAD; checkout a branch first." >&2; exit 1
+  fi
   if ! k3d cluster list | grep -q infra-challenge; then
-    k3d cluster create --config local/k3d-config.yaml
+    k3d cluster create --config envs/local/cluster/k3d-config.yaml
   else
     k3d cluster start infra-challenge 2>/dev/null || true
   fi
   until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
   just dev-image
-  cd envs/local && tofu init \
-    && tofu apply -target=module.gitops.helm_release.argocd -auto-approve \
-    && tofu apply -auto-approve
+  cd "{{repo_root}}/envs/local" && \
+    tofu init && \
+    tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitea
+  cd "{{repo_root}}" && bash envs/local/cluster/scripts/gitea-setup.sh
+  cd "{{repo_root}}/envs/local" && \
+    tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitops.helm_release.argocd
+  cd "{{repo_root}}/envs/local" && \
+    tofu apply -auto-approve -var "greeter_branch=$branch"
+  echo
+  echo "Gitea web:  http://localhost:3000  (gitea-admin / gitea-admin)"
+  echo "Branch:     $branch"
+  echo "ArgoCD UI:  just argocd-ui"
 
 # Build and push greeter image to local registry
 dev-image:
@@ -229,52 +243,19 @@ dev-deploy:
 
 # Run smoke tests against local cluster
 dev-test:
-  bash local/scripts/smoke-test.sh
+  bash envs/local/cluster/scripts/smoke-test.sh
 
 # Tear down local k3d cluster
 dev-down:
   k3d cluster delete infra-challenge
 
 # ============================================================
-# Local Gitea (optional, fully offline GitOps)
+# Gitea workflow (in-cluster GitOps)
 # ============================================================
-
-# Phased: cluster → image → gitea → push current branch → argocd → app CR
-dev-up-gitea:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  branch="$(git rev-parse --abbrev-ref HEAD)"
-  if [[ "$branch" == "HEAD" ]]; then
-    echo "ERROR: detached HEAD; checkout a branch first." >&2; exit 1
-  fi
-  if ! k3d cluster list | grep -q infra-challenge; then
-    k3d cluster create --config local/k3d-config.yaml
-  else
-    k3d cluster start infra-challenge 2>/dev/null || true
-  fi
-  until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
-  just dev-image
-  cd "{{repo_root}}/envs/local" && \
-    tofu init && \
-    tofu apply -auto-approve \
-      -var gitea_enabled=true -var "greeter_branch=$branch" \
-      -target=helm_release.gitea
-  cd "{{repo_root}}" && bash local/scripts/gitea-setup.sh
-  cd "{{repo_root}}/envs/local" && \
-    tofu apply -auto-approve \
-      -var gitea_enabled=true -var "greeter_branch=$branch" \
-      -target=module.gitops.helm_release.argocd
-  cd "{{repo_root}}/envs/local" && \
-    tofu apply -auto-approve \
-      -var gitea_enabled=true -var "greeter_branch=$branch"
-  echo
-  echo "Gitea web:  http://localhost:3000  (gitea-admin / gitea-admin)"
-  echo "Branch:     $branch"
-  echo "ArgoCD UI:  just argocd-ui"
 
 # Force-push current branch to Gitea (idempotent)
 gitea-setup:
-  bash local/scripts/gitea-setup.sh
+  bash envs/local/cluster/scripts/gitea-setup.sh
 
 # Force ArgoCD to re-evaluate immediately after `git push gitea`
 gitea-sync:
@@ -291,8 +272,8 @@ argocd-ui:
 
 # Static-check gitea-setup.sh
 test-gitea-script:
-  shellcheck local/scripts/gitea-setup.sh
-  bash -n local/scripts/gitea-setup.sh
+  shellcheck envs/local/cluster/scripts/gitea-setup.sh
+  bash -n envs/local/cluster/scripts/gitea-setup.sh
 
 # ============================================================
 # Aggregated

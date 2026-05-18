@@ -11,15 +11,16 @@ output "argocd_port_forward_hint" {
 }
 
 output "argocd_target_revision" {
-  value = local.greeter_target_rev
+  value = var.greeter_branch
 }
 
 output "gitea_push_url" {
-  value       = var.gitea_enabled ? local.gitea_host_url : ""
-  description = "Host-reachable URL for `git push gitea ...`. Empty when gitea_enabled=false."
+  value       = module.gitea.push_url
+  description = "Host-reachable URL (with credentials) for `git push gitea ...`."
+  sensitive   = true
 }
 
 output "gitea_web_url" {
-  value       = var.gitea_enabled ? "http://localhost:3000" : ""
-  description = "Gitea web UI URL. Empty when gitea_enabled=false."
+  value       = module.gitea.web_url
+  description = "Host-reachable Gitea web UI URL."
 }

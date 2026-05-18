@@ -29,7 +29,7 @@ resource "kubernetes_manifest" "appproject" {
       namespace = var.argocd_namespace
     }
     spec = {
-      sourceRepos = [var.greeter_repo_url]
+      sourceRepos = [var.repo_url]
       destinations = [{
         namespace = var.greeter_namespace
         server    = "https://kubernetes.default.svc"
@@ -52,8 +52,8 @@ resource "kubernetes_manifest" "application" {
     spec = {
       project = "greeter"
       source = {
-        repoURL        = var.greeter_repo_url
-        targetRevision = var.greeter_target_revision
+        repoURL        = var.repo_url
+        targetRevision = var.target_revision
         path           = var.greeter_chart_path
         helm           = { valueFiles = [local.values_file] }
       }

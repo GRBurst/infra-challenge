@@ -8,14 +8,17 @@ variable "kubeconfig_context" {
   default = "k3d-infra-challenge"
 }
 
-variable "gitea_enabled" {
-  type        = bool
-  description = "Deploy in-cluster Gitea and point ArgoCD at it instead of GitHub."
-  default     = false
-}
-
 variable "greeter_branch" {
   type        = string
-  description = "Branch ArgoCD tracks. Required when gitea_enabled=true."
-  default     = ""
+  description = "Branch ArgoCD tracks (also the branch force-pushed to Gitea)."
+  validation {
+    condition     = length(var.greeter_branch) > 0
+    error_message = "greeter_branch must be a non-empty branch name."
+  }
+}
+
+variable "gitea_chart_version" {
+  type        = string
+  description = "Pinned Gitea Helm chart version."
+  default     = "11.0.1"
 }

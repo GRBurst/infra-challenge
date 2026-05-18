@@ -1,6 +1,10 @@
 mock_provider "helm" {}
 mock_provider "kubernetes" {}
 
+variables {
+  greeter_branch = "feature/demo-x"
+}
+
 run "module_emits_greeter_namespace" {
   command = plan
   assert {
@@ -17,56 +21,59 @@ run "module_emits_port_forward_hint_for_local_context" {
   }
 }
 
-run "default_uses_github_repo_url" {
+run "always_provisions_gitea_in_gitea_namespace" {
   command = plan
   assert {
-    condition = strcontains(
-      module.gitops.application_repo_url,
-      "github.com/GRBurst/infra-challenge"
-    )
-    error_message = "When gitea_enabled=false, repo URL must remain GitHub."
+    condition     = module.gitea.namespace == "gitea"
+    error_message = "Local env must always provision Gitea in the gitea namespace."
   }
 }
 
-run "gitea_enabled_switches_repo_url_and_branch" {
+run "argocd_application_points_at_in_cluster_gitea" {
   command = plan
-  variables {
-    gitea_enabled  = true
-    greeter_branch = "feature/demo-x"
-  }
-  assert {
-    condition     = output.argocd_target_revision == "feature/demo-x"
-    error_message = "Application targetRevision must equal greeter_branch when set."
-  }
-  assert {
-    condition = strcontains(
-      output.gitea_push_url,
-      "localhost:3000"
-    )
-    error_message = "gitea_push_url must expose localhost:3000 for host pushes."
-  }
   assert {
     condition = strcontains(
       module.gitops.application_repo_url,
       "gitea-http.gitea.svc.cluster.local"
     )
-    error_message = "When gitea_enabled=true, repoURL must use in-cluster Gitea DNS."
+    error_message = "Application repo URL must point at the in-cluster Gitea service."
   }
 }
 
-run "gitea_disabled_emits_no_push_url" {
-  command = plan
-  assert {
-    condition     = output.gitea_push_url == ""
-    error_message = "gitea_push_url must be empty when gitea_enabled=false."
-  }
-}
-
-run "rejects_empty_branch_when_gitea_enabled" {
+run "argocd_application_tracks_greeter_branch" {
   command = plan
   variables {
-    gitea_enabled  = true
+    greeter_branch = "feature/demo-foo"
+  }
+  assert {
+    condition     = output.argocd_target_revision == "feature/demo-foo"
+    error_message = "ArgoCD targetRevision must equal greeter_branch."
+  }
+}
+
+run "gitea_push_url_exposes_host_port" {
+  command = plan
+  assert {
+    condition = strcontains(
+      nonsensitive(output.gitea_push_url),
+      "localhost:3000"
+    )
+    error_message = "gitea_push_url must expose localhost:3000 for host pushes."
+  }
+}
+
+run "gitea_web_url_exposes_host_port" {
+  command = plan
+  assert {
+    condition     = output.gitea_web_url == "http://localhost:3000"
+    error_message = "gitea_web_url must point at the host-side Gitea UI."
+  }
+}
+
+run "rejects_empty_branch" {
+  command = plan
+  variables {
     greeter_branch = ""
   }
-  expect_failures = [terraform_data.validate_gitea_inputs]
+  expect_failures = [var.greeter_branch]
 }

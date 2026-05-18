@@ -7,19 +7,20 @@ variable "environment" {
   }
 }
 
-variable "greeter_repo_url" {
-  type    = string
-  default = "https://github.com/GRBurst/infra-challenge.git"
+variable "repo_url" {
+  type        = string
+  description = "Git repository URL ArgoCD pulls from."
+}
+
+variable "target_revision" {
+  type        = string
+  description = "Git ref (branch/tag/commit) ArgoCD tracks."
+  default     = "HEAD"
 }
 
 variable "greeter_chart_path" {
   type    = string
   default = "charts/greeter"
-}
-
-variable "greeter_target_revision" {
-  type    = string
-  default = "HEAD"
 }
 
 variable "argocd_chart_version" {

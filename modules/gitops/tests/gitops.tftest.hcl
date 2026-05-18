@@ -3,6 +3,7 @@ mock_provider "kubernetes" {}
 
 variables {
   environment = "local"
+  repo_url    = "https://github.com/GRBurst/infra-challenge.git"
 }
 
 run "argocd_installed_into_argocd_namespace" {
@@ -40,25 +41,18 @@ run "invalid_environment_rejected" {
   expect_failures = [var.environment]
 }
 
-run "custom_repo_url_flows_to_application_and_appproject" {
+run "uses_repo_url_input_verbatim" {
   command = plan
   variables {
-    environment      = "local"
-    greeter_repo_url = "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
+    repo_url = "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
   }
   assert {
-    condition = strcontains(
-      jsonencode(kubernetes_manifest.application.manifest),
-      "gitea-http.gitea.svc.cluster.local"
-    )
-    error_message = "Application.spec.source.repoURL must use override."
+    condition     = kubernetes_manifest.application.manifest.spec.source.repoURL == "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
+    error_message = "Application.spec.source.repoURL must equal repo_url input verbatim."
   }
   assert {
-    condition = strcontains(
-      jsonencode(kubernetes_manifest.appproject.manifest),
-      "gitea-http.gitea.svc.cluster.local"
-    )
-    error_message = "AppProject.spec.sourceRepos must use override."
+    condition     = kubernetes_manifest.appproject.manifest.spec.sourceRepos[0] == "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
+    error_message = "AppProject.spec.sourceRepos must restrict to repo_url input verbatim."
   }
 }
 
@@ -76,14 +70,10 @@ run "appproject_permits_namespace_for_create_namespace_sync_option" {
 run "custom_target_revision_flows_to_application" {
   command = plan
   variables {
-    environment             = "local"
-    greeter_target_revision = "feature/demo-x"
+    target_revision = "feature/demo-x"
   }
   assert {
-    condition = strcontains(
-      jsonencode(kubernetes_manifest.application.manifest),
-      "feature/demo-x"
-    )
-    error_message = "Application.spec.source.targetRevision must reflect override."
+    condition     = kubernetes_manifest.application.manifest.spec.source.targetRevision == "feature/demo-x"
+    error_message = "Application.spec.source.targetRevision must reflect target_revision input."
   }
 }
