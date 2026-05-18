@@ -55,7 +55,10 @@ resource "kubernetes_manifest" "application" {
         repoURL        = var.repo_url
         targetRevision = var.target_revision
         path           = var.greeter_chart_path
-        helm           = { valueFiles = [local.values_file] }
+        helm = {
+          valueFiles = [local.values_file]
+          parameters = [{ name = "helloTag", value = "$ARGOCD_APP_REVISION_SHORT" }]
+        }
       }
       destination = {
         server    = "https://kubernetes.default.svc"

@@ -77,3 +77,14 @@ run "custom_target_revision_flows_to_application" {
     error_message = "Application.spec.source.targetRevision must reflect target_revision input."
   }
 }
+
+run "hello_tag_uses_argocd_revision_short" {
+  command = plan
+  assert {
+    condition = anytrue([
+      for p in kubernetes_manifest.application.manifest.spec.source.helm.parameters :
+      p.name == "helloTag" && p.value == "$ARGOCD_APP_REVISION_SHORT"
+    ])
+    error_message = "Application Helm parameters must inject helloTag=$ARGOCD_APP_REVISION_SHORT so ArgoCD substitutes the live commit SHA at sync time."
+  }
+}
