@@ -221,7 +221,7 @@ dev-up:
     tofu init && \
     tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitea
   # Assert Gitea is actually healthy before proceeding — fail loudly if not
-  kubectl --context "$CTX" -n gitea rollout status statefulset/gitea --timeout=300s
+  kubectl --context "$CTX" -n gitea rollout status deployment/gitea --timeout=300s
   kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
 
   echo "==> Bootstrapping Gitea repo..."
@@ -267,7 +267,7 @@ dev-check:
   set -euo pipefail
   CTX="k3d-infra-challenge"
   echo "--- Gitea ---"
-  kubectl --context "$CTX" -n gitea rollout status statefulset/gitea --timeout=60s
+  kubectl --context "$CTX" -n gitea rollout status deployment/gitea --timeout=60s
   kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
   echo "  gitea-http service: OK"
   echo "--- ArgoCD ---"
