@@ -8,6 +8,10 @@ buildTime: "unset"
 service:
   type: ClusterIP
   port: 8080
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
 hpa:
   enabled: true
   minReplicas: 2

@@ -8,3 +8,6 @@ hpa:
   enabled: false
 pdb:
   enabled: false
+ingress:
+  enabled: true
+  className: traefik
