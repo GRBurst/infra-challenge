@@ -304,6 +304,7 @@ production path.
 | No network policies | Service mesh adds complexity with no app-level benefit yet | Calico or Cilium network policies per namespace |
 | No IRSA for the greeter | Greeter has no AWS API dependency (YAGNI) | Add `aws_iam_role.greeter_irsa` in `modules/platform` when an AWS SDK call is needed |
 | `ci_infra_role` has `AdministratorAccess` | Scoping requires enumerating all IaC actions | Replace with a least-privilege policy once the resource set stabilises |
+| CI commit-back requires `git pull --rebase` before every push | After each build, CI commits updated `values-dev.yaml` back to the branch; any local checkout diverges by one commit | Replace with ArgoCD Image Updater, which writes directly to the cluster without touching the branch; or promote images via a separate `refs/heads/env/dev` values branch that developers never work on |
 
 ______________________________________________________________________
 
