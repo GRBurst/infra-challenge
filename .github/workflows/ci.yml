@@ -149,7 +149,13 @@ jobs:
       - name: Tofu init
         working-directory: envs/dev
         run: nix develop --command tofu init -input=false -no-color
-      - name: Tofu apply (phase 2 — full, deploys ArgoCD)
+      - name: Tofu apply (phase 2a — install ArgoCD helm release only)
+        working-directory: envs/dev
+        run: |
+          nix develop --command tofu apply \
+            -target=module.gitops.helm_release.argocd \
+            -auto-approve -input=false -no-color
+      - name: Tofu apply (phase 2b — full, applies AppProject + Application)
         working-directory: envs/dev
         run: nix develop --command tofu apply -auto-approve -input=false -no-color
       - name: Print outputs

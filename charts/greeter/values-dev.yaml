@@ -7,6 +7,3 @@ service:
   type: LoadBalancer
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-serviceAccount:
-  annotations:
-    eks.amazonaws.com/role-arn: ""

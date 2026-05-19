@@ -51,8 +51,38 @@ expect "deploy-gitops reads CI_INFRA_ROLE_ARN var" \
   "yq -e '.jobs.\"deploy-gitops\".env | to_entries[] | select(.value | test(\"CI_INFRA_ROLE_ARN\"))' $WF"
 expect "deploy-gitops calls tofu apply" \
   "yq -e '[.jobs.\"deploy-gitops\".steps[].run | select(. == \"*tofu apply*\")] | length > 0' $WF"
-expect "deploy-gitops tofu apply has no -target flag" \
-  "[ \"\$(yq '[.jobs.\"deploy-gitops\".steps[].run | select(. == \"*tofu apply*\") | select(. == \"*-target*\")] | length' $WF)\" = \"0\" ]"
+
+# --- deploy-gitops two-phase apply ---
+
+expect "deploy-gitops phase 2a targets module.gitops.helm_release.argocd" \
+  "yq -e '
+     [ .jobs.\"deploy-gitops\".steps[].run
+       | select(. != null)
+       | select(test(\"tofu apply\"))
+       | select(test(\"-target=module.gitops.helm_release.argocd\")) ]
+     | length == 1
+   ' $WF"
+
+expect "deploy-gitops phase 2b is an untargeted full apply" \
+  "yq -e '
+     [ .jobs.\"deploy-gitops\".steps[].run
+       | select(. != null)
+       | select(test(\"tofu apply\"))
+       | select(test(\"-target\") | not) ]
+     | length == 1
+   ' $WF"
+
+expect "deploy-gitops 2a precedes 2b" \
+  "yq -e '
+     ( [ .jobs.\"deploy-gitops\".steps | to_entries[]
+         | select(.value.run != null and (.value.run | test(\"-target=module.gitops.helm_release.argocd\"))) ]
+       | .[0].key
+     ) <
+     ( [ .jobs.\"deploy-gitops\".steps | to_entries[]
+         | select(.value.run != null and (.value.run | test(\"tofu apply\")) and (.value.run | test(\"-target\") | not)) ]
+       | .[0].key
+     )
+   ' $WF"
 
 # --- regression guards on existing jobs ---
 expect "check job still exists" \

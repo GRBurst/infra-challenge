@@ -370,8 +370,8 @@ dev-infra-smoke:
   ENDPOINT="$(kubectl get svc -n greeter greeter -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
   [[ -n "$ENDPOINT" ]] || { echo "No LoadBalancer endpoint yet"; exit 1; }
   echo "Endpoint: $ENDPOINT"
-  curl -sI "http://$ENDPOINT/" | grep -i 'X-Hello-Tag'
-  curl -s   "http://$ENDPOINT/version" | jq .
+  curl -sI "http://$ENDPOINT:8080/"        | grep -i 'X-Hello-Tag'
+  curl -s   "http://$ENDPOINT:8080/version" | jq .
 
 # Check yq is available in devShell
 yq-available:
