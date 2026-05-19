@@ -34,3 +34,9 @@ variable "argocd_host_port" {
   description = "Local port used in the ArgoCD port-forward hint."
   default     = 8080
 }
+
+variable "create_apps" {
+  type        = bool
+  description = "Create ArgoCD AppProject and Application manifests. Set to false during initial bootstrap before CRDs exist."
+  default     = true
+}

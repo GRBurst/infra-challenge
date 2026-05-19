@@ -76,3 +76,13 @@ resource "kubernetes_manifest" "application" {
   }
   depends_on = [kubernetes_manifest.appproject]
 }
+
+moved {
+  from = kubernetes_manifest.appproject
+  to   = kubernetes_manifest.appproject[0]
+}
+
+moved {
+  from = kubernetes_manifest.application
+  to   = kubernetes_manifest.application[0]
+}

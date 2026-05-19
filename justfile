@@ -218,26 +218,23 @@ dev-up:
   fi
   if ! k3d cluster list | grep -q infra-challenge; then
     k3d cluster create --config envs/local/cluster/k3d-config.yaml
+    rm -f "{{repo_root}}/envs/local/terraform.tfstate" "{{repo_root}}/envs/local/terraform.tfstate.backup"
   else
     k3d cluster start infra-challenge 2>/dev/null || true
   fi
   until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
   just dev-image
 
-  echo "==> Deploying Gitea..."
+  echo "==> Deploying Gitea + ArgoCD..."
   cd "{{repo_root}}/envs/local" && \
     tofu init && \
-    tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitea
+    tofu apply -auto-approve -var "greeter_branch=$branch" -var "create_apps=false"
   # Assert Gitea is actually healthy before proceeding — fail loudly if not
   kubectl --context "$CTX" -n gitea rollout status deployment/gitea --timeout=300s
   kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
 
   echo "==> Bootstrapping Gitea repo..."
   cd "{{repo_root}}" && bash envs/local/cluster/scripts/gitea-setup.sh
-
-  echo "==> Deploying ArgoCD..."
-  cd "{{repo_root}}/envs/local" && \
-    tofu apply -auto-approve -var "greeter_branch=$branch" -target=module.gitops.helm_release.argocd
 
   echo "==> Applying Application CR..."
   cd "{{repo_root}}/envs/local" && \
@@ -295,6 +292,7 @@ dev-check:
 # Tear down local k3d cluster
 dev-down:
   k3d cluster delete infra-challenge
+  rm -f "{{repo_root}}/envs/local/terraform.tfstate" "{{repo_root}}/envs/local/terraform.tfstate.backup"
 
 # ============================================================
 # Gitea workflow (in-cluster GitOps)
