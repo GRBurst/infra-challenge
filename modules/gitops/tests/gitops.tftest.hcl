@@ -18,7 +18,7 @@ run "application_points_at_local_values_file" {
   command = plan
   assert {
     condition = strcontains(
-      jsonencode(kubernetes_manifest.application.manifest),
+      jsonencode(kubernetes_manifest.application[0].manifest),
       "values-local.yaml"
     )
     error_message = "Application CR must reference values-local.yaml when environment=local."
@@ -28,7 +28,7 @@ run "application_points_at_local_values_file" {
 run "appproject_restricts_to_greeter_namespace" {
   command = plan
   assert {
-    condition     = length(kubernetes_manifest.appproject.manifest.spec.destinations) == 1
+    condition     = length(kubernetes_manifest.appproject[0].manifest.spec.destinations) == 1
     error_message = "AppProject must whitelist exactly one destination."
   }
 }
@@ -47,11 +47,11 @@ run "uses_repo_url_input_verbatim" {
     repo_url = "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
   }
   assert {
-    condition     = kubernetes_manifest.application.manifest.spec.source.repoURL == "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
+    condition     = kubernetes_manifest.application[0].manifest.spec.source.repoURL == "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
     error_message = "Application.spec.source.repoURL must equal repo_url input verbatim."
   }
   assert {
-    condition     = kubernetes_manifest.appproject.manifest.spec.sourceRepos[0] == "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
+    condition     = kubernetes_manifest.appproject[0].manifest.spec.sourceRepos[0] == "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/infra-challenge.git"
     error_message = "AppProject.spec.sourceRepos must restrict to repo_url input verbatim."
   }
 }
@@ -60,7 +60,7 @@ run "appproject_permits_namespace_for_create_namespace_sync_option" {
   command = plan
   assert {
     condition = anytrue([
-      for r in kubernetes_manifest.appproject.manifest.spec.clusterResourceWhitelist :
+      for r in kubernetes_manifest.appproject[0].manifest.spec.clusterResourceWhitelist :
       r.group == "" && r.kind == "Namespace"
     ])
     error_message = "AppProject.clusterResourceWhitelist must include Namespace so CreateNamespace=true can create the greeter namespace at PreSync."
@@ -73,7 +73,7 @@ run "custom_target_revision_flows_to_application" {
     target_revision = "feature/demo-x"
   }
   assert {
-    condition     = kubernetes_manifest.application.manifest.spec.source.targetRevision == "feature/demo-x"
+    condition     = kubernetes_manifest.application[0].manifest.spec.source.targetRevision == "feature/demo-x"
     error_message = "Application.spec.source.targetRevision must reflect target_revision input."
   }
 }
@@ -87,7 +87,7 @@ run "hello_tag_uses_full_revision_for_local" {
   }
   assert {
     condition = anytrue([
-      for p in kubernetes_manifest.application.manifest.spec.source.helm.parameters :
+      for p in kubernetes_manifest.application[0].manifest.spec.source.helm.parameters :
       p.name == "helloTag" && p.value == "$ARGOCD_APP_REVISION"
     ])
     error_message = "For local env, Application must inject helloTag=$ARGOCD_APP_REVISION (full SHA)."
@@ -102,7 +102,7 @@ run "hello_tag_parameter_omitted_for_dev" {
     target_revision = "main"
   }
   assert {
-    condition     = length(kubernetes_manifest.application.manifest.spec.source.helm.parameters) == 0
+    condition     = length(kubernetes_manifest.application[0].manifest.spec.source.helm.parameters) == 0
     error_message = "For dev env, Helm parameters must be empty so values-dev.yaml is the single source of truth for helloTag."
   }
 }
