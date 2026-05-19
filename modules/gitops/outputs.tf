@@ -11,10 +11,10 @@ output "application_name" {
 }
 
 output "application_repo_url" {
-  value       = kubernetes_manifest.application.manifest.spec.source.repoURL
-  description = "Effective repoURL of the greeter ArgoCD Application."
+  value       = try(kubernetes_manifest.application[0].manifest.spec.source.repoURL, null)
+  description = "Effective repoURL of the greeter ArgoCD Application. Null when create_apps = false."
 }
 
 output "application_target_revision" {
-  value = kubernetes_manifest.application.manifest.spec.source.targetRevision
+  value = try(kubernetes_manifest.application[0].manifest.spec.source.targetRevision, null)
 }

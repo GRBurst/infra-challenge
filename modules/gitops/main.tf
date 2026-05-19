@@ -21,6 +21,7 @@ resource "helm_release" "argocd" {
 }
 
 resource "kubernetes_manifest" "appproject" {
+  count = var.create_apps ? 1 : 0
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "AppProject"
@@ -42,6 +43,7 @@ resource "kubernetes_manifest" "appproject" {
 }
 
 resource "kubernetes_manifest" "application" {
+  count = var.create_apps ? 1 : 0
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"

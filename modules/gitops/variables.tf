@@ -37,3 +37,9 @@ variable "greeter_namespace" {
   type    = string
   default = "greeter"
 }
+
+variable "create_apps" {
+  type        = bool
+  description = "Create ArgoCD AppProject and Application manifests. Set to false when ArgoCD CRDs are not yet installed (initial bootstrap)."
+  default     = true
+}

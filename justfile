@@ -127,8 +127,12 @@ lint-core-fix:
 lint-yaml:
   yamllint .
 
-# Check: all lint checks (core + yaml)
-lint: lint-core lint-yaml
+# Check: GitHub Actions workflow schema
+lint-actions:
+  actionlint .github/workflows/ci.yml
+
+# Check: all lint checks (core + yaml + actions)
+lint: lint-core lint-yaml lint-actions
 
 # Fix: all auto-fixable lint issues
 lint-fix: lint-core-fix
@@ -144,7 +148,7 @@ validate:
   while IFS= read -r dir; do
     echo "--- Validating $dir ---"
     (cd "$dir" && tofu init -backend=false -input=false -no-color && tofu validate -no-color)
-  done < <(find envs -name 'main.tf' -exec dirname {} \; | sort)
+  done < <(find envs -name 'main.tf' -not -path '*/.terraform/*' -exec dirname {} \; | sort)
 
 # Run TFLint across the repository
 tflint:
@@ -172,7 +176,7 @@ test:
     module_dir=$(dirname "$tests_dir")
     echo "--- Testing $module_dir ---"
     (cd "$module_dir" && tofu init -backend=false -input=false -no-color && tofu test -no-color)
-  done < <(find modules envs -type d -name tests | sort -u)
+  done < <(find modules envs -type d -name tests -not -path '*/.terraform/*' | sort -u)
 
 # Run Go tests
 test-go:
@@ -182,6 +186,10 @@ test-go:
 test-chart:
   helm lint charts/greeter
   helm unittest charts/greeter
+
+# Static contract test for ci.yml structure
+test-ci-workflow:
+  bash tests/ci-workflow-test.sh
 
 # Run OpenTofu tests for gitops module and local env
 test-tofu:
@@ -193,7 +201,7 @@ test-tofu:
   (cd envs/local && tofu init -backend=false -input=false -no-color && tofu test -no-color)
 
 # Run all tests: Go, Helm, OpenTofu, and static checks
-test-all: test-go test-chart test-tofu test-gitea-script
+test-all: test-go test-chart test-tofu test-gitea-script test-ci-workflow
 
 # ============================================================
 # Local dev lifecycle
@@ -313,6 +321,63 @@ argocd-ui:
 test-gitea-script:
   shellcheck envs/local/cluster/scripts/gitea-setup.sh
   bash -n envs/local/cluster/scripts/gitea-setup.sh
+
+# ============================================================
+# Dev environment (AWS EKS)
+# ============================================================
+
+# Stage 1: provision VPC + EKS + ECR (provider chicken-and-egg solution)
+dev-infra-up:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  tofu init
+  tofu apply -target=module.bootstrap -auto-approve
+  tofu apply -target=module.platform  -auto-approve
+  echo "==> VPC + EKS + ECR + IAM provisioned."
+  echo "    Cluster:        $(tofu output -raw cluster_name)"
+  echo "    ECR URL:        $(tofu output -raw ecr_repository_url)"
+  echo "    ECR registry:   $(tofu output -raw ecr_registry_host)"
+  echo "    Next:           just dev-gitops-up"
+
+# Stage 2: deploy ArgoCD + Application CRs (requires EKS from stage 1)
+dev-gitops-up:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  # Phase 1: install ArgoCD and its CRDs before planning the full state.
+  # kubernetes_manifest validates AppProject/Application against the live API at plan
+  # time; the CRDs must exist first (hashicorp/kubernetes issue #2597).
+  tofu apply -target=module.gitops.helm_release.argocd -auto-approve
+  tofu apply -auto-approve
+  echo "==> ArgoCD deployed. Sync begins within 3 minutes."
+
+# Full teardown (destroy in reverse: gitops → platform → bootstrap)
+dev-infra-down:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  tofu destroy -target=module.gitops   -auto-approve || true
+  tofu destroy -target=module.platform -auto-approve
+  echo "==> EKS + VPC + ECR destroyed. Bootstrap retained."
+
+# Show dev environment info
+dev-infra-info:
+  cd "{{repo_root}}/envs/dev" && tofu output
+
+# DoD smoke test against deployed AWS greeter
+dev-infra-smoke:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  ENDPOINT="$(kubectl get svc -n greeter greeter -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+  [[ -n "$ENDPOINT" ]] || { echo "No LoadBalancer endpoint yet"; exit 1; }
+  echo "Endpoint: $ENDPOINT"
+  curl -sI "http://$ENDPOINT/" | grep -i 'X-Hello-Tag'
+  curl -s   "http://$ENDPOINT/version" | jq .
+
+# Check yq is available in devShell
+yq-available:
+  @command -v yq >/dev/null || { echo "yq missing from devShell"; exit 1; }
 
 # ============================================================
 # Aggregated
