@@ -57,7 +57,9 @@ resource "kubernetes_manifest" "application" {
         path           = var.greeter_chart_path
         helm = {
           valueFiles = [local.values_file]
-          parameters = [{ name = "helloTag", value = "$ARGOCD_APP_REVISION_SHORT" }]
+          parameters = var.environment == "local" ? [
+            { name = "helloTag", value = "$ARGOCD_APP_REVISION" }
+          ] : []
         }
       }
       destination = {

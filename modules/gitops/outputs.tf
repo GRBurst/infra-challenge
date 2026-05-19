@@ -14,3 +14,7 @@ output "application_repo_url" {
   value       = kubernetes_manifest.application.manifest.spec.source.repoURL
   description = "Effective repoURL of the greeter ArgoCD Application."
 }
+
+output "application_target_revision" {
+  value = kubernetes_manifest.application.manifest.spec.source.targetRevision
+}

@@ -78,13 +78,31 @@ run "custom_target_revision_flows_to_application" {
   }
 }
 
-run "hello_tag_uses_argocd_revision_short" {
+run "hello_tag_uses_full_revision_for_local" {
   command = plan
+  variables {
+    environment     = "local"
+    repo_url        = "http://gitea-http.gitea.svc.cluster.local:3000/x/y.git"
+    target_revision = "main"
+  }
   assert {
     condition = anytrue([
       for p in kubernetes_manifest.application.manifest.spec.source.helm.parameters :
-      p.name == "helloTag" && p.value == "$ARGOCD_APP_REVISION_SHORT"
+      p.name == "helloTag" && p.value == "$ARGOCD_APP_REVISION"
     ])
-    error_message = "Application Helm parameters must inject helloTag=$ARGOCD_APP_REVISION_SHORT so ArgoCD substitutes the live commit SHA at sync time."
+    error_message = "For local env, Application must inject helloTag=$ARGOCD_APP_REVISION (full SHA)."
+  }
+}
+
+run "hello_tag_parameter_omitted_for_dev" {
+  command = plan
+  variables {
+    environment     = "dev"
+    repo_url        = "https://github.com/GRBurst/infra-challenge.git"
+    target_revision = "main"
+  }
+  assert {
+    condition     = length(kubernetes_manifest.application.manifest.spec.source.helm.parameters) == 0
+    error_message = "For dev env, Helm parameters must be empty so values-dev.yaml is the single source of truth for helloTag."
   }
 }

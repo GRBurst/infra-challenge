@@ -1,5 +1,7 @@
 data "aws_caller_identity" "current" {}
 
+data "aws_region" "current" {}
+
 # Base label for the module
 module "label" {
   source      = "cloudposse/label/null"
@@ -88,32 +90,89 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
 }
 
-resource "aws_iam_role" "ci_role" {
+moved {
+  from = aws_iam_role.ci_role
+  to   = aws_iam_role.ci_infra_role
+}
+
+moved {
+  from = aws_iam_role_policy_attachment.ci_admin
+  to   = aws_iam_role_policy_attachment.ci_infra_admin
+}
+
+resource "aws_iam_role" "ci_infra_role" {
   name = module.oidc_label.id
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.github.arn
-        }
-        Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          }
-          StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:*"
-          }
+    Statement = [{
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/main"
         }
       }
-    ]
+    }]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "ci_admin" {
-  role       = aws_iam_role.ci_role.name
+resource "aws_iam_role_policy_attachment" "ci_infra_admin" {
+  role       = aws_iam_role.ci_infra_role.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+module "ci_app_label" {
+  source  = "cloudposse/label/null"
+  version = "0.25.0"
+  context = module.label.context
+  name    = "ci-app-role"
+}
+
+resource "aws_iam_role" "ci_app_role" {
+  name = module.ci_app_label.id
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Effect    = "Allow"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:environment:${var.environment}"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ci_app_ecr" {
+  name = "ecr-push"
+  role = aws_iam_role.ci_app_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:PutImage",
+          "ecr:DescribeImages",
+        ]
+        Resource = "arn:aws:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/${var.namespace}-${var.environment}-greeter"
+      },
+    ]
+  })
 }
