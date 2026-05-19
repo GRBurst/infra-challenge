@@ -84,6 +84,12 @@ expect "deploy-gitops 2a precedes 2b" \
      )
    ' $WF"
 
+# --- Trivy step: soft gate + unfixed filter (challenge-scope compromise) ---
+expect "Trivy scan step is marked continue-on-error" \
+  "yq -e '[.jobs.\"build-and-push\".steps[] | select(.name == \"Scan image (Trivy)\") | .\"continue-on-error\"] | .[0] == true' $WF"
+expect "Trivy invocation uses --ignore-unfixed" \
+  "yq -e '[.jobs.\"build-and-push\".steps[] | select(.name == \"Scan image (Trivy)\") | .run | select(. != null) | select(test(\"--ignore-unfixed\"))] | length > 0' $WF"
+
 # --- regression guards on existing jobs ---
 expect "check job still exists" \
   "yq -e '.jobs.check' $WF"

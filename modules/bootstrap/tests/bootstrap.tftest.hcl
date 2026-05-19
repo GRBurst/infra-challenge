@@ -40,25 +40,25 @@ variables {
   github_repo = "GRBurst/infra-challenge"
 }
 
-run "ci_infra_role_oidc_sub_is_tightened" {
+run "ci_infra_role_oidc_sub_is_scoped_to_environment" {
   command = plan
   assert {
     condition = strcontains(
       aws_iam_role.ci_infra_role.assume_role_policy,
-      "repo:GRBurst/infra-challenge:ref:refs/heads/challenge"
+      "repo:GRBurst/infra-challenge:environment:dev"
     )
-    error_message = "ci_infra_role OIDC sub must be scoped to challenge branch only."
+    error_message = "ci_infra_role OIDC sub must be scoped to GitHub Environment 'dev'; the deploy-platform/deploy-gitops jobs run with `environment: dev`, so GitHub mints `sub=repo:OWNER/REPO:environment:dev` (not a branch ref)."
   }
 }
 
-run "ci_infra_role_oidc_sub_rejects_wildcard" {
+run "ci_infra_role_oidc_sub_rejects_branch_ref" {
   command = plan
   assert {
     condition = !strcontains(
       aws_iam_role.ci_infra_role.assume_role_policy,
-      "repo:GRBurst/infra-challenge:ref:refs/heads/main"
+      "ref:refs/heads/"
     )
-    error_message = "ci_infra_role must not accept main branch (currently swapped to challenge)."
+    error_message = "ci_infra_role trust policy must not pin to a branch ref; the job runs inside a GitHub Environment, which drops the ref component from the OIDC sub claim."
   }
 }
 

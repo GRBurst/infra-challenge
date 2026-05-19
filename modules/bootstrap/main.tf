@@ -103,6 +103,9 @@ moved {
 resource "aws_iam_role" "ci_infra_role" {
   name = module.oidc_label.id
 
+  # The deploy-platform/deploy-gitops jobs run inside GitHub Environment
+  # `${var.environment}`, so the OIDC sub claim is
+  # `repo:<owner>/<repo>:environment:<env>` (no branch ref component).
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -112,7 +115,7 @@ resource "aws_iam_role" "ci_infra_role" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/challenge"
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:environment:${var.environment}"
         }
       }
     }]
