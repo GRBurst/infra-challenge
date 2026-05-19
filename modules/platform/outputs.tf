@@ -26,3 +26,8 @@ output "vpc_id" {
 output "private_subnet_ids" {
   value = var.create ? module.vpc.private_subnets : []
 }
+
+output "cluster_admin_role_arn" {
+  value       = var.create && length(var.cluster_admin_arns) > 0 ? aws_iam_role.cluster_admin[0].arn : ""
+  description = "Assume this role for kubectl access: aws eks update-kubeconfig --role-arn <this>"
+}

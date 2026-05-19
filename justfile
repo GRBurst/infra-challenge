@@ -52,7 +52,7 @@ fmt-md:
   #!/usr/bin/env bash
   set -euo pipefail
   git ls-files -z -- '*.md' ':(exclude)refs/**' \
-    | xargs -0 --no-run-if-empty mdformat
+    | xargs -0 --no-run-if-empty mdformat --number
 
 # Check: all formatting (CI equivalent)
 fmt-check: fmt-tofu-check fmt-nix-check fmt-yaml-check fmt-md-check

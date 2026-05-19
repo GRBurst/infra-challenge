@@ -63,3 +63,9 @@ variable "create" {
   default     = true
   description = "Whether to create platform resources. Set to false to skip AWS resource creation (useful for offline testing)."
 }
+
+variable "cluster_admin_arns" {
+  type        = list(string)
+  default     = []
+  description = "IAM ARNs allowed to assume the cluster-admin role. Stable across re-applies."
+}

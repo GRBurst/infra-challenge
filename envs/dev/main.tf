@@ -9,9 +9,10 @@ module "bootstrap" {
 module "platform" {
   source = "../../modules/platform"
 
-  namespace   = "hm"
-  environment = "dev"
-  create      = var.create_platform
+  namespace          = "hm"
+  environment        = "dev"
+  create             = var.create_platform
+  cluster_admin_arns = ["arn:aws:iam::532287339094:user/julius"]
 }
 
 module "gitops" {

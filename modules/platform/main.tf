@@ -81,6 +81,19 @@ module "eks" {
   authentication_mode                      = "API"
   enable_cluster_creator_admin_permissions = true
 
+  access_entries = length(aws_iam_role.cluster_admin) > 0 ? {
+    cluster_admin = {
+      kubernetes_groups = []
+      principal_arn     = aws_iam_role.cluster_admin[0].arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  } : {}
+
   addons = {
     # Versions verified at plan-authoring time via aws eks describe-addon-versions --kubernetes-version 1.35.
     coredns = {
@@ -103,6 +116,22 @@ module "eks" {
       subnet_ids     = module.vpc.private_subnets
     }
   }
+
+  tags = module.label.tags
+}
+
+resource "aws_iam_role" "cluster_admin" {
+  count = var.create && length(var.cluster_admin_arns) > 0 ? 1 : 0
+  name  = "${local.cluster_name}-cluster-admin"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { AWS = var.cluster_admin_arns }
+      Action    = "sts:AssumeRole"
+    }]
+  })
 
   tags = module.label.tags
 }

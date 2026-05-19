@@ -1,37 +1,137 @@
-## Local AWS auth
+# infra-challenge
 
-- Run `aws login`, then
-- `eval "$(aws configure export-credentials --format env)"`
+A production-minded GitOps skeleton on AWS: a Go greeter service running in
+EKS, deployed via ArgoCD, built by GitHub Actions with Nix, with state in S3.
 
-## CI deploy flow
+| Concern | Tool |
+|--------------------|-------------------------------------------|
+| Infrastructure | OpenTofu (Terraform) |
+| Build | Nix (reproducible binary + image) |
+| Container registry | AWS ECR |
+| Compute | AWS EKS (managed node groups) |
+| CI | GitHub Actions + OIDC (no stored keys) |
+| CD / GitOps | ArgoCD (pull-based, 3-min polling) |
+| App packaging | Helm chart |
+| Local dev | k3d + Gitea + ArgoCD |
 
-`.github/workflows/ci.yml` runs the following jobs on every push to `main`:
+______________________________________________________________________
 
-| Job | Purpose |
-| ----------------- | ------------------------------------------------------------- |
-| `check` | fmt, lint, tflint, security scan, OpenTofu + Helm + Go tests |
-| `build-and-push` | Nix-builds the greeter image, scans with trivy, pushes to ECR |
-| `deploy-platform` | `tofu apply -target=module.bootstrap -target=module.platform` |
-| `deploy-gitops` | full `tofu apply` (deploys ArgoCD + greeter Application CR) |
+## Prerequisites
 
-Both deploy jobs assume `ci_infra_role` via GitHub OIDC. The two-phase apply
-exists because `envs/dev/providers.tf` configures `helm`/`kubernetes` providers
-from `data.aws_eks_cluster.this` — that data source must succeed before phase 2
-can plan.
+All tools are provided by the [Nix](https://nixos.org/) dev shell. With Nix
+installed, run:
 
-### One-time GitHub Environment bootstrap
+```sh
+nix develop
+```
 
-Before CI can deploy, the `dev` GitHub Environment must have four variables
-populated from the OpenTofu outputs of `envs/dev`:
+This drops you into a shell with: `opentofu`, `just`, `kubectl`, `helm`, `k3d`,
+`awscli2`, `trivy`, `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters.
+No manual installs required.
 
-| GitHub variable | OpenTofu output | Consumer |
-| -------------------- | -------------------- | ---------------------------------- |
-| `CI_INFRA_ROLE_ARN` | `ci_infra_role_arn` | `deploy-platform`, `deploy-gitops` |
-| `CI_APP_ROLE_ARN` | `ci_app_role_arn` | `build-and-push` |
-| `ECR_REPOSITORY_URL` | `ecr_repository_url` | `build-and-push` |
-| `ECR_REGISTRY_HOST` | `ecr_registry_host` | `build-and-push` |
+`just` is the task runner. Run `just` with no arguments to list all available
+commands.
 
-This can be achieved by using the gh tool:
+______________________________________________________________________
+
+## Repository layout
+
+```
+.github/workflows/ci.yml   CI pipeline (check, build, deploy)
+charts/greeter/            Helm chart for the greeter service
+  values.yaml              defaults
+  values-dev.yaml          dev overrides — image.tag, helloTag, buildTime (CI-managed)
+envs/
+  dev/                     AWS dev environment (OpenTofu root)
+  local/                   Local k3d environment (OpenTofu root)
+modules/
+  bootstrap/               Per-account: S3 state bucket, DynamoDB, OIDC, CI IAM roles
+  platform/                Per-env: VPC, EKS, ECR, cluster-admin IAM role
+  gitops/                  ArgoCD Helm release + AppProject + Application CRs
+greeter.go                 Go service source
+flake.nix                  Nix build + devShell definition
+justfile                   All task-runner commands
+```
+
+______________________________________________________________________
+
+## Local development (k3d)
+
+The local environment runs a full GitOps loop — Gitea (self-hosted Git) +
+ArgoCD — inside a k3d cluster. ArgoCD watches a local mirror of the current
+branch, so pushes to Gitea trigger resyncs without touching GitHub.
+
+### Start the local stack
+
+```sh
+just dev-up
+```
+
+This creates a k3d cluster, builds the greeter image with Nix, pushes it to the
+in-cluster registry, deploys Gitea and ArgoCD via OpenTofu, bootstraps the
+Gitea repo, and applies the ArgoCD Application CR. Takes ~3 minutes on first
+run.
+
+Once ready:
+
+| Service | URL | Credentials |
+|---------|------------------------------------------|-------------------|
+| Greeter | <http://localhost:8081/> | — |
+| Gitea | <http://localhost:3000> | gitea-admin / gitea-admin |
+| ArgoCD | run `just argocd-ui`, then <http://localhost:8080> | admin / (printed by command) |
+
+### Iterate on a change
+
+```sh
+# Edit greeter.go or charts/greeter/...
+just dev-image          # rebuild + push image to local registry
+git add . && git commit -m "my change"
+just gitea-setup        # force-push current branch to Gitea
+just gitea-sync         # trigger immediate ArgoCD re-evaluation
+just dev-check          # wait for rollout + assert Synced + Healthy
+```
+
+### Run smoke tests
+
+```sh
+just dev-test
+```
+
+### Tear down
+
+```sh
+just dev-down
+```
+
+______________________________________________________________________
+
+## AWS dev environment
+
+### First-time bootstrap
+
+The bootstrap is a one-time manual step. After that, CI owns all applies.
+
+**1. Authenticate to AWS**
+
+```sh
+aws login           # or: aws configure
+eval "$(aws configure export-credentials --format env)"
+```
+
+**2. Provision infrastructure**
+
+```sh
+just dev-infra-up       # VPC + EKS + ECR + IAM (stage 1)
+just dev-gitops-up      # ArgoCD + Application CRs (stage 2)
+```
+
+Stage 2 is split from stage 1 because the Kubernetes provider needs the EKS
+cluster to exist before it can validate ArgoCD CRDs at plan time.
+
+**3. Populate GitHub Environment variables**
+
+The `dev` GitHub Environment needs four variables so CI can assume roles and
+push images. Run once after `dev-infra-up`:
 
 ```sh
 gh variable set ECR_REPOSITORY_URL --env dev --body "$(cd envs/dev && tofu output -raw ecr_repository_url)"
@@ -40,12 +140,185 @@ gh variable set CI_APP_ROLE_ARN    --env dev --body "$(cd envs/dev && tofu outpu
 gh variable set CI_INFRA_ROLE_ARN  --env dev --body "$(cd envs/dev && tofu output -raw ci_infra_role_arn)"
 ```
 
-Bootstrap procedure:
+These are not secrets — they are IAM role ARNs and ECR URLs. After this step,
+push to the `challenge` branch and CI takes over.
 
-- Apply infra locally once: `just dev-infra-up`.
-- Read outputs: `just dev-infra-info`.
-- In GitHub → Settings → Environments → `dev` → Variables, add each value above.
-  None are credentials.
-- Push to `main` — `deploy-platform` and `deploy-gitops` then take over.
+### CI/CD pipeline
 
-The `[skip ci]` marker on the values-dev.yaml commit-back prevents loops.
+Every push to `challenge` runs four jobs:
+
+| Job | Triggered by | What it does |
+|-------------------|---------------------------|---------------------------------------------------------------|
+| `check` | all branches | fmt, lint, tflint, security scan, OpenTofu + Helm + Go tests |
+| `build-and-push` | `challenge` branch | Nix build → Trivy scan → push to ECR → commit updated `values-dev.yaml` |
+| `deploy-platform` | `challenge` (after check) | `tofu apply` for bootstrap + platform modules |
+| `deploy-gitops` | `challenge` (after platform) | two-phase apply: ArgoCD Helm release, then Application CRs |
+
+Authentication is OIDC-based — no IAM keys are stored in GitHub Secrets.
+`build-and-push` uses `ci_app_role` (ECR push only); the deploy jobs use
+`ci_infra_role` (scoped to `environment: dev`).
+
+After `build-and-push` updates `charts/greeter/values-dev.yaml`, ArgoCD detects
+the commit within 3 minutes, renders the chart with the new image tag, and
+rolls out the new pods. The `[skip ci]` marker on that commit prevents a loop.
+
+### Accessing the cluster (kubectl)
+
+After bootstrap, use the cluster-admin role output:
+
+```sh
+aws eks update-kubeconfig \
+  --name hm-dev-eks \
+  --region eu-central-1 \
+  --role-arn "$(cd envs/dev && tofu output -raw cluster_admin_role_arn)"
+
+kubectl get nodes
+kubectl get pods -n greeter
+```
+
+This role is stable across CI re-applies because it is an explicit EKS access
+entry, independent of who ran `tofu apply`.
+
+### ArgoCD
+
+ArgoCD runs inside the cluster with no public endpoint. Access it via
+port-forward:
+
+```sh
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+# open http://localhost:8080
+# username: admin
+# password:
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d
+```
+
+ArgoCD polls the `challenge` branch of this repository every 3 minutes. The
+Application is configured with `automated.prune = true` and
+`selfHeal = true` — any drift is corrected automatically.
+
+### Greeter endpoints
+
+The greeter is exposed on port 8080 via an AWS NLB. Get the endpoint:
+
+```sh
+kubectl get svc -n greeter greeter \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+
+| Endpoint | Description |
+|------------------------------------|----------------------------------------------------------|
+| `GET /` | Returns `Hello, <client-ip>! I'm <pod-name>` |
+| `GET /?textInjection=<text>` | Appends `<text>` (≤ 256 bytes) to the greeting |
+| `GET /healthz` | Returns 200 (used by readiness + liveness probes) |
+| `GET /version` | Returns `{"helloTag":"<sha>","buildTime":"<rfc3339>","hostname":"<pod>"}` |
+| Response header `X-Hello-Tag` | Full git SHA on every response |
+
+Quick verification:
+
+```sh
+NLB=$(kubectl get svc -n greeter greeter -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+curl "http://$NLB:8080/"
+curl -s "http://$NLB:8080/version" | jq .
+curl -sI "http://$NLB:8080/" | grep X-Hello-Tag
+```
+
+Or use the justfile shortcut after kubeconfig is configured:
+
+```sh
+just dev-infra-smoke
+```
+
+### Tear down
+
+Destroys EKS, VPC, and ECR. The S3 state bucket and DynamoDB table are
+retained (they are cheap and hold history).
+
+```sh
+just dev-infra-down
+```
+
+______________________________________________________________________
+
+## Testing
+
+```sh
+just test-all           # Go + Helm + OpenTofu + shellcheck + CI workflow structure
+just test-go            # Go unit tests
+just test-chart         # Helm lint + helm-unittest
+just test               # OpenTofu native tests for all modules and envs
+just test-ci-workflow   # Static assertions on ci.yml structure (yq-based)
+just dev-test           # Smoke tests against the local k3d cluster
+just dev-infra-smoke    # Smoke tests against the AWS dev environment
+```
+
+______________________________________________________________________
+
+## Development workflow
+
+A typical change:
+
+1. Edit `greeter.go`, `charts/greeter/`, or infrastructure modules.
+2. `just check` — runs fmt + lint + validate + tflint locally.
+3. `just test-all` — full test suite (no network required; uses mock providers).
+4. Commit and push to `challenge`.
+5. CI runs `check`, then `build-and-push` (new image + updated `values-dev.yaml`).
+6. ArgoCD detects the values commit within 3 minutes and rolls out the new image.
+7. Verify: `just dev-infra-smoke`.
+
+### Adding a new environment
+
+Each environment lives in its own `envs/<env>/` directory and AWS account.
+Copy `envs/dev/`, update the account ID in `backend.tf` and `providers.tf`,
+run `just dev-infra-up` and `just dev-gitops-up` from the new directory, then
+add a matching GitHub Environment with the role ARNs from `tofu output`. Each
+account needs its own OIDC provider — the `bootstrap` module provisions it.
+Gate prod with required reviewers in GitHub Settings → Environments so no push
+deploys to prod without approval.
+
+### Making the repo private
+
+ArgoCD currently reads the public repo without credentials. When the repo goes
+private, create a Kubernetes Secret labeled
+`argocd.argoproj.io/secret-type=repository` and apply it out-of-band — never
+via OpenTofu, as credentials must not enter Tofu state. Use a GitHub App
+(recommended: short-lived tokens, automatic rotation) or a read-only Deploy
+Key as a simpler alternative.
+
+______________________________________________________________________
+
+## Tradeoffs and limitations
+
+Conscious scope decisions made for this challenge. Each has a documented
+production path.
+
+| Limitation | Reason | Production path |
+|---|---|---|
+| HTTP-only on port 8080 (no TLS) | No ACM certificate provisioned | ACM + ALB Ingress Controller + port 443 |
+| Single NAT Gateway | 3× cost for HA; acceptable for a challenge | `single_nat_gateway = false` in the VPC module |
+| Trivy scan is non-blocking | Nix base image has unfixed upstream CVEs the app cannot patch | Pin `nixpkgs` revision, strip unused packages, re-enable `--exit-code 1` |
+| ArgoCD UI not publicly exposed | Requires ALB + ACM + DNS; YAGNI for port-forward access | ALB Ingress + ACM + Dex (GitHub SSO) |
+| ArgoCD polls every 3 min (no webhooks) | Webhooks require a public ArgoCD endpoint | GitHub webhook → `argocd.server.service.type=LoadBalancer` |
+| No Prometheus / Grafana | Full observability stack is out of scope | CloudWatch Container Insights or ADOT for K8s metrics |
+| No image signing | Key management overhead not justified here | cosign + ECR + OPA/Gatekeeper admission policy |
+| No network policies | Service mesh adds complexity with no app-level benefit yet | Calico or Cilium network policies per namespace |
+| No IRSA for the greeter | Greeter has no AWS API dependency (YAGNI) | Add `aws_iam_role.greeter_irsa` in `modules/platform` when an AWS SDK call is needed |
+| `ci_infra_role` has `AdministratorAccess` | Scoping requires enumerating all IaC actions | Replace with a least-privilege policy once the resource set stabilises |
+
+______________________________________________________________________
+
+## Key commands reference
+
+```sh
+just                    # list all commands
+just dev-up             # start local k3d stack
+just dev-down           # tear down local k3d stack
+just dev-infra-up       # provision AWS VPC + EKS + ECR (stage 1)
+just dev-gitops-up      # deploy ArgoCD + Application CRs (stage 2)
+just dev-infra-down     # destroy AWS EKS + VPC + ECR
+just dev-infra-info     # print all OpenTofu outputs for dev env
+just check              # full local CI check (fmt + lint + validate)
+just fix                # auto-fix formatting and lint issues
+just test-all           # run all tests
+just fmt                # fix all formatting
+```

@@ -128,3 +128,33 @@ run "default_tags_emitted_via_null_label" {
     error_message = "Platform module must wire cloudposse/label/null for consistent tagging."
   }
 }
+
+run "cluster_admin_arns_defaults_to_empty_list" {
+  command = plan
+  assert {
+    condition     = length(var.cluster_admin_arns) == 0
+    error_message = "cluster_admin_arns must default to empty list."
+  }
+}
+
+run "cluster_admin_arns_accepts_iam_user_arn" {
+  command = plan
+  variables {
+    cluster_admin_arns = ["arn:aws:iam::532287339094:user/julius"]
+  }
+  assert {
+    condition     = contains(var.cluster_admin_arns, "arn:aws:iam::532287339094:user/julius")
+    error_message = "cluster_admin_arns must accept IAM user ARNs."
+  }
+}
+
+run "cluster_admin_role_not_created_when_create_false" {
+  command = plan
+  variables {
+    cluster_admin_arns = ["arn:aws:iam::532287339094:user/julius"]
+  }
+  assert {
+    condition     = length(aws_iam_role.cluster_admin) == 0
+    error_message = "cluster_admin IAM role must not be created when create=false."
+  }
+}

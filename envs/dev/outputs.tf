@@ -29,3 +29,7 @@ output "ecr_registry_host" {
 output "greeter_namespace" {
   value = module.gitops.greeter_namespace
 }
+
+output "cluster_admin_role_arn" {
+  value = module.platform.cluster_admin_role_arn
+}
