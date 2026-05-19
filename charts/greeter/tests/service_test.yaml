@@ -16,3 +16,18 @@ tests:
             port: 8080
             targetPort: http
             protocol: TCP
+  - it: defaults to ClusterIP when no overrides
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+  - it: becomes LoadBalancer with NLB annotation when values-dev.yaml is applied
+    values:
+      - ../values-dev.yaml
+    asserts:
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+      - equal:
+          path: metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-type"]
+          value: nlb
