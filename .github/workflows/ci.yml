@@ -3,7 +3,7 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, challenge]
   pull_request:
 jobs:
   check:
@@ -21,7 +21,7 @@ jobs:
       - run: nix develop --command just test-ci-workflow
   build-and-push:
     needs: check
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/challenge'
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -95,7 +95,7 @@ jobs:
           fi
   deploy-platform:
     needs: check
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/challenge'
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -128,7 +128,7 @@ jobs:
         run: nix develop --command tofu output
   deploy-gitops:
     needs: deploy-platform
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/challenge'
     runs-on: ubuntu-latest
     environment: dev
     permissions:

@@ -45,9 +45,9 @@ run "ci_infra_role_oidc_sub_is_tightened" {
   assert {
     condition = strcontains(
       aws_iam_role.ci_infra_role.assume_role_policy,
-      "repo:GRBurst/infra-challenge:ref:refs/heads/main"
+      "repo:GRBurst/infra-challenge:ref:refs/heads/challenge"
     )
-    error_message = "ci_infra_role OIDC sub must be scoped to main branch only."
+    error_message = "ci_infra_role OIDC sub must be scoped to challenge branch only."
   }
 }
 
@@ -56,9 +56,9 @@ run "ci_infra_role_oidc_sub_rejects_wildcard" {
   assert {
     condition = !strcontains(
       aws_iam_role.ci_infra_role.assume_role_policy,
-      "repo:GRBurst/infra-challenge:*"
+      "repo:GRBurst/infra-challenge:ref:refs/heads/main"
     )
-    error_message = "ci_infra_role must not accept wildcard sub claim."
+    error_message = "ci_infra_role must not accept main branch (currently swapped to challenge)."
   }
 }
 

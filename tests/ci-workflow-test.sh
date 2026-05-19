@@ -23,8 +23,8 @@ expect() {
 # --- deploy-platform job ---
 expect "deploy-platform job exists" \
   "yq -e '.jobs.\"deploy-platform\"' $WF"
-expect "deploy-platform gated to main" \
-  "yq -e '.jobs.\"deploy-platform\".if | test(\"refs/heads/main\")' $WF"
+expect "deploy-platform gated to challenge" \
+  "yq -e '.jobs.\"deploy-platform\".if | test(\"refs/heads/challenge\")' $WF"
 expect "deploy-platform has id-token write" \
   "yq -e '.jobs.\"deploy-platform\".permissions.\"id-token\" == \"write\"' $WF"
 expect "deploy-platform uses dev environment" \
@@ -41,8 +41,8 @@ expect "deploy-gitops job exists" \
   "yq -e '.jobs.\"deploy-gitops\"' $WF"
 expect "deploy-gitops needs deploy-platform" \
   "yq -e '.jobs.\"deploy-gitops\".needs | test(\"deploy-platform\")' $WF"
-expect "deploy-gitops gated to main" \
-  "yq -e '.jobs.\"deploy-gitops\".if | test(\"refs/heads/main\")' $WF"
+expect "deploy-gitops gated to challenge" \
+  "yq -e '.jobs.\"deploy-gitops\".if | test(\"refs/heads/challenge\")' $WF"
 expect "deploy-gitops has id-token write" \
   "yq -e '.jobs.\"deploy-gitops\".permissions.\"id-token\" == \"write\"' $WF"
 expect "deploy-gitops uses dev environment" \
@@ -57,8 +57,8 @@ expect "deploy-gitops tofu apply has no -target flag" \
 # --- regression guards on existing jobs ---
 expect "check job still exists" \
   "yq -e '.jobs.check' $WF"
-expect "build-and-push still gated to main" \
-  "yq -e '.jobs.\"build-and-push\".if | test(\"refs/heads/main\")' $WF"
+expect "build-and-push still gated to challenge" \
+  "yq -e '.jobs.\"build-and-push\".if | test(\"refs/heads/challenge\")' $WF"
 expect "build-and-push still needs check" \
   "yq -e '.jobs.\"build-and-push\".needs | test(\"check\")' $WF"
 

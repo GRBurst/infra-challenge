@@ -19,7 +19,7 @@ module "gitops" {
 
   environment     = "dev"
   repo_url        = "https://github.com/GRBurst/infra-challenge.git"
-  target_revision = "main"
+  target_revision = "challenge"
 
   depends_on = [module.platform]
 }

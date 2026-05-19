@@ -46,7 +46,7 @@ run "providers_cluster_name_matches_formula" {
   }
 }
 
-run "gitops_module_tracks_main_branch" {
+run "gitops_module_tracks_challenge_branch" {
   command = plan
   override_module {
     target = module.bootstrap
@@ -59,8 +59,8 @@ run "gitops_module_tracks_main_branch" {
     }
   }
   assert {
-    condition     = module.gitops.application_target_revision == "main"
-    error_message = "gitops module target_revision must be 'main' for dev."
+    condition     = module.gitops.application_target_revision == "challenge"
+    error_message = "gitops module target_revision must be 'challenge' for dev (temporary; revert when merging to main)."
   }
 }
 
