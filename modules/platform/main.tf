@@ -82,12 +82,12 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   addons = {
-    # Versions verified at plan-authoring time via aws eks describe-addon-versions --kubernetes-version 1.32.
+    # Versions verified at plan-authoring time via aws eks describe-addon-versions --kubernetes-version 1.33.
     coredns = {
-      addon_version = "v1.11.4-eksbuild.33"
+      addon_version = "v1.13.2-eksbuild.7"
     }
     kube-proxy = {
-      addon_version = "v1.32.13-eksbuild.8"
+      addon_version = "v1.33.10-eksbuild.5"
     }
     vpc-cni = {
       addon_version = "v1.21.1-eksbuild.8"

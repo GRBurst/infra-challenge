@@ -79,6 +79,7 @@
           opentofu
           just
           pre-commit
+          pinact
           treefmt
           nixfmt-rfc-style
           yamlfmt

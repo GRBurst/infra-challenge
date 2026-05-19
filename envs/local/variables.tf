@@ -20,7 +20,7 @@ variable "greeter_branch" {
 variable "gitea_chart_version" {
   type        = string
   description = "Pinned Gitea Helm chart version."
-  default     = "11.0.1"
+  default     = "12.6.0"
 }
 
 variable "greeter_host_port" {
