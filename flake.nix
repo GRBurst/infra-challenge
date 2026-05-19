@@ -74,6 +74,7 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
+          actionlint
           awscli2
           opentofu
           just
@@ -92,6 +93,7 @@
           kubeconform
           go
           jq
+          yq-go
           bash
         ];
 
