@@ -1,10 +1,10 @@
 # infra-challenge
 
-A production-minded GitOps skeleton on AWS: a Go greeter service running in
-EKS, deployed via ArgoCD, built by GitHub Actions with Nix, with state in S3.
+A production-minded GitOps skeleton on AWS: a Go greeter service running in EKS,
+deployed via ArgoCD, built by GitHub Actions with Nix, with state in S3.
 
-| Concern | Tool |
-|--------------------|-------------------------------------------|
+| Responsibility | Tool / Infrastructure |
+| ------------------ | -------------------------------------- |
 | Infrastructure | OpenTofu (Terraform) |
 | Build | Nix (reproducible binary + image) |
 | Container registry | AWS ECR |
@@ -26,11 +26,16 @@ nix develop
 ```
 
 This drops you into a shell with: `opentofu`, `just`, `kubectl`, `helm`, `k3d`,
-`awscli2`, `trivy`, `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters.
-No manual installs required.
+`awscli2`, `trivy`, `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters. No
+manual installs required. These are many tools for a simple demo, but I mostly
+compied those from existing projects I setup and am working on.
 
 `just` is the task runner. Run `just` with no arguments to list all available
-commands.
+commands. This is heavily used to centralize all scripting parts.
+
+> Note: This is a nix flake setup. It requires an initialized git repository to
+> work and a flake support enabled, see
+> [Flakes](https://nixos.wiki/wiki/flakes).
 
 ______________________________________________________________________
 
@@ -57,9 +62,15 @@ ______________________________________________________________________
 
 ## Local development (k3d)
 
-The local environment runs a full GitOps loop — Gitea (self-hosted Git) +
-ArgoCD — inside a k3d cluster. ArgoCD watches a local mirror of the current
-branch, so pushes to Gitea trigger resyncs without touching GitHub.
+The local environment runs a full GitOps loop — Gitea (self-hosted Git) + ArgoCD
+— inside a k3d cluster. ArgoCD watches a local mirror of the current branch, so
+pushes to Gitea trigger resyncs without touching GitHub.
+
+Although not required, I had some skeleton from a previous project already in
+place which I extended for a playground. It is generally nice to to have a local
+setup running, though this gets more and more complicated with complex
+infrastructure. Still, it allows lots of testing and verification in a very
+quick local loop.
 
 ### Start the local stack
 
@@ -68,15 +79,14 @@ just dev-up
 ```
 
 This creates a k3d cluster, builds the greeter image with Nix, pushes it to the
-in-cluster registry, deploys Gitea and ArgoCD via OpenTofu, bootstraps the
-Gitea repo, and applies the ArgoCD Application CR. Takes ~3 minutes on first
-run.
+in-cluster registry, deploys Gitea and ArgoCD via OpenTofu, bootstraps the Gitea
+repo, and applies the ArgoCD Application CR. Takes a few minutes on first run.
 
 Once ready:
 
 | Service | URL | Credentials |
-|---------|------------------------------------------|-------------------|
-| Greeter | <http://localhost:8081/> | — |
+| ------- | -------------------------------------------------- | ---------------------------- |
+| Greeter | <http://localhost:8081/> | --- |
 | Gitea | <http://localhost:3000> | gitea-admin / gitea-admin |
 | ArgoCD | run `just argocd-ui`, then <http://localhost:8080> | admin / (printed by command) |
 
@@ -85,9 +95,10 @@ Once ready:
 ```sh
 # Edit greeter.go or charts/greeter/...
 just dev-image          # rebuild + push image to local registry
-git add . && git commit -m "my change"
+git add .               # or specify which files you want to commit
+git commit -m "my msg"
 just gitea-setup        # force-push current branch to Gitea
-just gitea-sync         # trigger immediate ArgoCD re-evaluation
+just gitea-sync         # trigger immediate ArgoCD re-evaluation (you can wait for it to trigger automatically as well)
 just dev-check          # wait for rollout + assert Synced + Healthy
 ```
 
@@ -118,6 +129,11 @@ aws login           # or: aws configure
 eval "$(aws configure export-credentials --format env)"
 ```
 
+Why this `eval` workaround? Simply put: `aws login` creates modern, temporary
+credentials with OAuth cached. OpenTofu's backend engine for the state does not
+understand this yet. I was surprised by this myself. When using `aws sso login`,
+you might not run into this limitation.
+
 **2. Provision infrastructure**
 
 ```sh
@@ -140,15 +156,15 @@ gh variable set CI_APP_ROLE_ARN    --env dev --body "$(cd envs/dev && tofu outpu
 gh variable set CI_INFRA_ROLE_ARN  --env dev --body "$(cd envs/dev && tofu output -raw ci_infra_role_arn)"
 ```
 
-These are not secrets — they are IAM role ARNs and ECR URLs. After this step,
-push to the `challenge` branch and CI takes over.
+These are not secrets, but IAM role ARNs and ECR URLs. After this step, push to
+the `challenge` branch and CI takes over.
 
 ### CI/CD pipeline
 
 Every push to `challenge` runs four jobs:
 
 | Job | Triggered by | What it does |
-|-------------------|---------------------------|---------------------------------------------------------------|
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------- |
 | `check` | all branches | fmt, lint, tflint, security scan, OpenTofu + Helm + Go tests |
 | `build-and-push` | `challenge` branch | Nix build → Trivy scan → push to ECR → commit updated `values-dev.yaml` |
 | `deploy-platform` | `challenge` (after check) | `tofu apply` for bootstrap + platform modules |
@@ -159,8 +175,8 @@ Authentication is OIDC-based — no IAM keys are stored in GitHub Secrets.
 `ci_infra_role` (scoped to `environment: dev`).
 
 After `build-and-push` updates `charts/greeter/values-dev.yaml`, ArgoCD detects
-the commit within 3 minutes, renders the chart with the new image tag, and
-rolls out the new pods. The `[skip ci]` marker on that commit prevents a loop.
+the commit within 3 minutes, renders the chart with the new image tag, and rolls
+out the new pods. The `[skip ci]` marker on that commit prevents a loop.
 
 ### Accessing the cluster (kubectl)
 
@@ -194,8 +210,8 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 ```
 
 ArgoCD polls the `challenge` branch of this repository every 3 minutes. The
-Application is configured with `automated.prune = true` and
-`selfHeal = true` — any drift is corrected automatically.
+Application is configured with `automated.prune = true` and `selfHeal = true` —
+any drift is corrected automatically.
 
 ### Greeter endpoints
 
@@ -207,7 +223,7 @@ kubectl get svc -n greeter greeter \
 ```
 
 | Endpoint | Description |
-|------------------------------------|----------------------------------------------------------|
+| ----------------------------- | ------------------------------------------------------------------------- |
 | `GET /` | Returns `Hello, <client-ip>! I'm <pod-name>` |
 | `GET /?textInjection=<text>` | Appends `<text>` (≤ 256 bytes) to the greeting |
 | `GET /healthz` | Returns 200 (used by readiness + liveness probes) |
@@ -231,8 +247,8 @@ just dev-infra-smoke
 
 ### Tear down
 
-Destroys EKS, VPC, and ECR. The S3 state bucket and DynamoDB table are
-retained (they are cheap and hold history).
+Destroys EKS, VPC, and ECR. The S3 state bucket and DynamoDB table are retained
+(they are cheap and hold history).
 
 ```sh
 just dev-infra-down
@@ -262,28 +278,30 @@ A typical change:
 2. `just check` — runs fmt + lint + validate + tflint locally.
 3. `just test-all` — full test suite (no network required; uses mock providers).
 4. Commit and push to `challenge`.
-5. CI runs `check`, then `build-and-push` (new image + updated `values-dev.yaml`).
-6. ArgoCD detects the values commit within 3 minutes and rolls out the new image.
+5. CI runs `check`, then `build-and-push` (new image + updated
+   `values-dev.yaml`).
+6. ArgoCD detects the values commit within 3 minutes and rolls out the new
+   image.
 7. Verify: `just dev-infra-smoke`.
 
 ### Adding a new environment
 
-Each environment lives in its own `envs/<env>/` directory and AWS account.
-Copy `envs/dev/`, update the account ID in `backend.tf` and `providers.tf`,
-run `just dev-infra-up` and `just dev-gitops-up` from the new directory, then
-add a matching GitHub Environment with the role ARNs from `tofu output`. Each
-account needs its own OIDC provider — the `bootstrap` module provisions it.
-Gate prod with required reviewers in GitHub Settings → Environments so no push
-deploys to prod without approval.
+Each environment lives in its own `envs/<env>/` directory and AWS account. Copy
+`envs/dev/`, update the account ID in `backend.tf` and `providers.tf`, run
+`just dev-infra-up` and `just dev-gitops-up` from the new directory, then add a
+matching GitHub Environment with the role ARNs from `tofu output`. Each account
+needs its own OIDC provider — the `bootstrap` module provisions it. Gate prod
+with required reviewers in GitHub Settings → Environments so no push deploys to
+prod without approval.
 
 ### Making the repo private
 
 ArgoCD currently reads the public repo without credentials. When the repo goes
 private, create a Kubernetes Secret labeled
-`argocd.argoproj.io/secret-type=repository` and apply it out-of-band — never
-via OpenTofu, as credentials must not enter Tofu state. Use a GitHub App
-(recommended: short-lived tokens, automatic rotation) or a read-only Deploy
-Key as a simpler alternative.
+`argocd.argoproj.io/secret-type=repository` and apply it out-of-band — never via
+OpenTofu, as credentials must not enter Tofu state. Use a GitHub App
+(recommended: short-lived tokens, automatic rotation) or a read-only Deploy Key
+as a simpler alternative.
 
 ______________________________________________________________________
 
@@ -293,18 +311,18 @@ Conscious scope decisions made for this challenge. Each has a documented
 production path.
 
 | Limitation | Reason | Production path |
-|---|---|---|
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HTTP-only on port 8080 (no TLS) | No ACM certificate provisioned | ACM + ALB Ingress Controller + port 443 |
-| Single NAT Gateway | 3× cost for HA; acceptable for a challenge | `single_nat_gateway = false` in the VPC module |
+| Single NAT Gateway | 3x cost for HA; acceptable for a challenge | `single_nat_gateway = false` in the VPC module |
 | Trivy scan is non-blocking | Nix base image has unfixed upstream CVEs the app cannot patch | Pin `nixpkgs` revision, strip unused packages, re-enable `--exit-code 1` |
-| ArgoCD UI not publicly exposed | Requires ALB + ACM + DNS; YAGNI for port-forward access | ALB Ingress + ACM + Dex (GitHub SSO) |
+| ArgoCD UI not publicly exposed | Requires ALB + ACM + DNS. port-forward access sufficient for demo. Different story for self-hosted git services (e.g. gitlab, gitea). | ALB Ingress + ACM + Dex (GitHub SSO) |
 | ArgoCD polls every 3 min (no webhooks) | Webhooks require a public ArgoCD endpoint | GitHub webhook → `argocd.server.service.type=LoadBalancer` |
 | No Prometheus / Grafana | Full observability stack is out of scope | CloudWatch Container Insights or ADOT for K8s metrics |
 | No image signing | Key management overhead not justified here | cosign + ECR + OPA/Gatekeeper admission policy |
 | No network policies | Service mesh adds complexity with no app-level benefit yet | Calico or Cilium network policies per namespace |
-| No IRSA for the greeter | Greeter has no AWS API dependency (YAGNI) | Add `aws_iam_role.greeter_irsa` in `modules/platform` when an AWS SDK call is needed |
+| No IAM Roles for SA for the greeter | Greeter has no AWS API dependency | Add `aws_iam_role.greeter_irsa` in `modules/platform` when an AWS SDK call is needed |
 | `ci_infra_role` has `AdministratorAccess` | Scoping requires enumerating all IaC actions | Replace with a least-privilege policy once the resource set stabilises |
-| CI commit-back requires `git pull --rebase` before every push | After each build, CI commits updated `values-dev.yaml` back to the branch; any local checkout diverges by one commit | Replace with ArgoCD Image Updater, which writes directly to the cluster without touching the branch; or promote images via a separate `refs/heads/env/dev` values branch that developers never work on |
+| CI commit-back requires `git pull --rebase` before every push | After each build, CI commits updated `values-dev.yaml` back to the branch; any local checkout diverges by one commit | Replace with ArgoCD Image Updater, which writes directly to the cluster without touching the branch; or promote images via a separate `refs/heads/env/dev` values branch that developers never work on. Separate repositories for app and infra deployment would solve this by design. |
 
 ______________________________________________________________________
 
