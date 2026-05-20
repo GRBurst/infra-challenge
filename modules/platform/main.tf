@@ -81,6 +81,9 @@ module "eks" {
   authentication_mode                      = "API"
   enable_cluster_creator_admin_permissions = false
 
+  # Pin KMS admin to stable ARNs so the key policy doesn't drift based on who runs apply.
+  kms_key_administrators = compact(concat(var.cluster_admin_arns, [var.ci_infra_role_arn]))
+
   access_entries = merge(
     length(aws_iam_role.cluster_admin) > 0 ? {
       cluster_admin = {
@@ -150,11 +153,13 @@ resource "aws_iam_role" "cluster_admin" {
   count = var.create && length(var.cluster_admin_arns) > 0 ? 1 : 0
   name  = "${local.cluster_name}-cluster-admin"
 
+  # Allow both human admins (cluster_admin_arns) and CI (ci_infra_role_arn) to assume this role.
+  # providers.tf uses --role-arn to get EKS tokens; both identities must be able to assume it.
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { AWS = var.cluster_admin_arns }
+      Principal = { AWS = compact(concat(var.cluster_admin_arns, [var.ci_infra_role_arn])) }
       Action    = "sts:AssumeRole"
     }]
   })
@@ -188,6 +193,15 @@ resource "aws_iam_role_policy" "cluster_admin_eks_console" {
       Resource = "*"
     }]
   })
+}
+
+# Tradeoff: AmazonEC2ReadOnlyAccess is broad (all EC2 read, all resources).
+# Required so the EKS console can show node instance details via EC2 APIs.
+# In prod, narrow this to the specific EC2 describe actions needed for the cluster's VPC/nodes.
+resource "aws_iam_role_policy_attachment" "cluster_admin_ec2_readonly" {
+  count      = var.create && length(var.cluster_admin_arns) > 0 ? 1 : 0
+  role       = aws_iam_role.cluster_admin[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
 }
 
 resource "aws_iam_role" "console_admin" {
