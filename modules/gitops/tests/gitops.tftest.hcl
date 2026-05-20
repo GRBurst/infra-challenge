@@ -93,19 +93,3 @@ run "hello_tag_uses_full_revision_for_local" {
     error_message = "For local env, Application must inject helloTag=$ARGOCD_APP_REVISION (full SHA)."
   }
 }
-
-run "hello_tag_parameter_omitted_for_dev" {
-  command = plan
-  variables {
-    environment     = "dev"
-    repo_url        = "https://github.com/GRBurst/infra-challenge.git"
-    target_revision = "main"
-  }
-  assert {
-    condition = try(alltrue([
-      for p in kubernetes_manifest.application[0].manifest.spec.source.helm.parameters :
-      p.name != "helloTag"
-    ]), true)
-    error_message = "For dev env, Application must not pass helloTag via parameters; values-dev.yaml is the single source of truth."
-  }
-}

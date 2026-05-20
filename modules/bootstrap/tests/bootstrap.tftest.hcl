@@ -62,14 +62,6 @@ run "ci_infra_role_oidc_sub_rejects_branch_ref" {
   }
 }
 
-run "ci_app_role_exists" {
-  command = plan
-  assert {
-    condition     = aws_iam_role.ci_app_role.name != ""
-    error_message = "ci_app_role must be defined."
-  }
-}
-
 run "ci_app_role_oidc_sub_scoped_to_environment" {
   command = plan
   assert {

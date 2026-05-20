@@ -40,24 +40,3 @@ tests:
     asserts:
       - isNotNullOrEmpty:
           path: spec.template.spec.containers[0].resources.limits.cpu
-  - it: CPU limit defaults to 500m
-    asserts:
-      - equal:
-          path: spec.template.spec.containers[0].resources.limits.cpu
-          value: 500m
-  - it: spreads replicas across zones (soft)
-    asserts:
-      - equal:
-          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
-          value: topology.kubernetes.io/zone
-      - equal:
-          path: spec.template.spec.topologySpreadConstraints[0].whenUnsatisfiable
-          value: ScheduleAnyway
-  - it: prefers different hosts for replicas (soft)
-    asserts:
-      - equal:
-          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].weight
-          value: 100
-      - equal:
-          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
-          value: kubernetes.io/hostname

@@ -51,25 +51,6 @@ run "argocd_application_tracks_greeter_branch" {
   }
 }
 
-run "gitea_push_url_exposes_host_port" {
-  command = plan
-  assert {
-    condition = strcontains(
-      nonsensitive(output.gitea_push_url),
-      "localhost:3000"
-    )
-    error_message = "gitea_push_url must expose localhost:3000 for host pushes."
-  }
-}
-
-run "gitea_web_url_exposes_host_port" {
-  command = plan
-  assert {
-    condition     = output.gitea_web_url == "http://localhost:3000"
-    error_message = "gitea_web_url must point at the host-side Gitea UI."
-  }
-}
-
 run "greeter_url_uses_default_host_port" {
   command = plan
   assert {

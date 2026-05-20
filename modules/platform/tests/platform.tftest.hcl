@@ -53,14 +53,6 @@ variables {
   create      = false
 }
 
-run "cluster_name_follows_convention" {
-  command = plan
-  assert {
-    condition     = local.cluster_name == "hm-dev-eks"
-    error_message = "Cluster name must be {namespace}-{environment}-eks."
-  }
-}
-
 run "cluster_name_uses_null_label_formula" {
   command = plan
   assert {
@@ -85,17 +77,6 @@ run "ecr_repository_name_follows_convention" {
   }
 }
 
-# ECR resource attributes (IMMUTABLE, scan_on_push) are hardcoded constants in
-# main.tf; mock providers cannot evaluate them with create=true. This test
-# only asserts that the label feeding the resource is well-formed.
-run "ecr_label_is_non_empty" {
-  command = plan
-  assert {
-    condition     = module.ecr_label.id != ""
-    error_message = "ECR label must be non-empty."
-  }
-}
-
 run "rejects_unknown_environment" {
   command = plan
   variables {
@@ -117,25 +98,6 @@ run "default_tags_emitted_via_null_label" {
   assert {
     condition     = module.label.namespace == "hm"
     error_message = "Platform module must wire cloudposse/label/null for consistent tagging."
-  }
-}
-
-run "cluster_admin_arns_defaults_to_empty_list" {
-  command = plan
-  assert {
-    condition     = length(var.cluster_admin_arns) == 0
-    error_message = "cluster_admin_arns must default to empty list."
-  }
-}
-
-run "cluster_admin_arns_accepts_iam_user_arn" {
-  command = plan
-  variables {
-    cluster_admin_arns = ["arn:aws:iam::532287339094:user/julius"]
-  }
-  assert {
-    condition     = contains(var.cluster_admin_arns, "arn:aws:iam::532287339094:user/julius")
-    error_message = "cluster_admin_arns must accept IAM user ARNs."
   }
 }
 

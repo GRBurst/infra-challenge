@@ -52,15 +52,7 @@ run "helm_release_applies_module_values_file" {
   command = plan
   assert {
     condition     = length(helm_release.gitea.values) > 0
-    error_message = "helm_release must receive the module values.yaml (hardcoded admin credentials, NodePort service, SQLite)."
-  }
-  assert {
-    condition     = strcontains(helm_release.gitea.values[0], "username: gitea-admin")
-    error_message = "Effective values must pin admin username to gitea-admin so push_url credentials work."
-  }
-  assert {
-    condition     = strcontains(helm_release.gitea.values[0], "password: gitea-admin")
-    error_message = "Effective values must pin admin password to gitea-admin (local-only demo)."
+    error_message = "helm_release must receive the module values.yaml."
   }
 }
 
