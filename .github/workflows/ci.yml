@@ -4,9 +4,18 @@
 name: ci
 on:
   push:
-    branches: [main, challenge]
   pull_request:
+env:
+  # Deploy branch: change this (and target_revision in envs/dev/terraform.tfvars) to switch.
+  DEPLOY_BRANCH: challenge
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_branch: ${{ steps.out.outputs.v }}
+    steps:
+      - id: out
+        run: echo "v=${{ env.DEPLOY_BRANCH }}" >> "$GITHUB_OUTPUT"
   check:
     runs-on: ubuntu-latest
     steps:
@@ -23,8 +32,8 @@ jobs:
       - run: nix develop --command just test
       - run: nix develop --command just test-ci-workflow
   build-and-push:
-    needs: check
-    if: github.ref == 'refs/heads/challenge'
+    needs: [check, config]
+    if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -100,8 +109,8 @@ jobs:
             git push
           fi
   deploy-platform:
-    needs: check
-    if: github.ref == 'refs/heads/challenge'
+    needs: [check, config]
+    if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)
     runs-on: ubuntu-latest
     environment: dev
     permissions:
@@ -135,8 +144,8 @@ jobs:
         working-directory: envs/dev
         run: nix develop --command tofu output
   deploy-gitops:
-    needs: deploy-platform
-    if: github.ref == 'refs/heads/challenge'
+    needs: [deploy-platform, config]
+    if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)
     runs-on: ubuntu-latest
     environment: dev
     permissions:

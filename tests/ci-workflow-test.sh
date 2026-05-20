@@ -23,8 +23,8 @@ expect() {
 # --- deploy-platform job ---
 expect "deploy-platform job exists" \
   "yq -e '.jobs.\"deploy-platform\"' $WF"
-expect "deploy-platform gated to challenge" \
-  "yq -e '.jobs.\"deploy-platform\".if | test(\"refs/heads/challenge\")' $WF"
+expect "deploy-platform gated to deploy_branch output" \
+  "yq -e '.jobs.\"deploy-platform\".if | test(\"needs.config.outputs.deploy_branch\")' $WF"
 expect "deploy-platform has id-token write" \
   "yq -e '.jobs.\"deploy-platform\".permissions.\"id-token\" == \"write\"' $WF"
 expect "deploy-platform uses dev environment" \
@@ -40,9 +40,9 @@ expect "deploy-platform calls tofu apply with -target=module.platform" \
 expect "deploy-gitops job exists" \
   "yq -e '.jobs.\"deploy-gitops\"' $WF"
 expect "deploy-gitops needs deploy-platform" \
-  "yq -e '.jobs.\"deploy-gitops\".needs | test(\"deploy-platform\")' $WF"
-expect "deploy-gitops gated to challenge" \
-  "yq -e '.jobs.\"deploy-gitops\".if | test(\"refs/heads/challenge\")' $WF"
+  "yq -e '.jobs.\"deploy-gitops\".needs[] | select(. == \"deploy-platform\")' $WF"
+expect "deploy-gitops gated to deploy_branch output" \
+  "yq -e '.jobs.\"deploy-gitops\".if | test(\"needs.config.outputs.deploy_branch\")' $WF"
 expect "deploy-gitops has id-token write" \
   "yq -e '.jobs.\"deploy-gitops\".permissions.\"id-token\" == \"write\"' $WF"
 expect "deploy-gitops uses dev environment" \
@@ -81,10 +81,12 @@ expect "Trivy invocation uses --ignore-unfixed" \
 # --- regression guards on existing jobs ---
 expect "check job still exists" \
   "yq -e '.jobs.check' $WF"
-expect "build-and-push still gated to challenge" \
-  "yq -e '.jobs.\"build-and-push\".if | test(\"refs/heads/challenge\")' $WF"
+expect "config job exposes deploy_branch output" \
+  "yq -e '.jobs.config.outputs.deploy_branch' $WF"
+expect "build-and-push gated to deploy_branch output" \
+  "yq -e '.jobs.\"build-and-push\".if | test(\"needs.config.outputs.deploy_branch\")' $WF"
 expect "build-and-push still needs check" \
-  "yq -e '.jobs.\"build-and-push\".needs | test(\"check\")' $WF"
+  "yq -e '.jobs.\"build-and-push\".needs[] | select(. == \"check\")' $WF"
 
 [ "$fail" -eq 0 ] || exit 1
 echo "All structural assertions passed."
