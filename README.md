@@ -65,11 +65,19 @@ envs/
 modules/
   bootstrap/               Per-account: S3 state bucket, DynamoDB, OIDC, CI IAM roles
   platform/                Per-env: VPC, EKS, ECR, cluster-admin IAM role
+  gitea/                   Gitea service for local git service setup
   gitops/                  ArgoCD Helm release + AppProject + Application CRs
 greeter.go                 Go service source
 flake.nix                  Nix build + devShell definition
 justfile                   All task-runner commands
 ```
+
+The modules make heavily use of terraform modules for most parts. This works
+well for most setups, but can get more complicated or might be overkill in some
+ways. It is always a balancing act between maintainability, best fit and
+boilerplate. However, in most cases it can drastically reduce the burden when
+setting up basic infrastructure and I would usually consider it as the way to
+go.
 
 ______________________________________________________________________
 
