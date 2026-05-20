@@ -1,8 +1,8 @@
 image:
   repository: "532287339094.dkr.ecr.eu-central-1.amazonaws.com/hm-dev-greeter"
-  tag: "62d3e58f4d4b46f40280bd7d6a9fbc42b0aad5bc"
-helloTag: "62d3e58f4d4b46f40280bd7d6a9fbc42b0aad5bc"
-buildTime: "2026-05-20T21:04:20Z"
+  tag: "88c4ed56635096d08b9a606f2c13fa1acfdeda33"
+helloTag: "88c4ed56635096d08b9a606f2c13fa1acfdeda33"
+buildTime: "2026-05-20T21:10:27Z"
 service:
   type: LoadBalancer
   annotations:
