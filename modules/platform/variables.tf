@@ -69,3 +69,15 @@ variable "cluster_admin_arns" {
   default     = []
   description = "IAM ARNs allowed to assume the cluster-admin role. Stable across re-applies."
 }
+
+variable "console_admin_arns" {
+  type        = list(string)
+  default     = []
+  description = "IAM ARNs allowed to assume the console-admin role (EKS console + kubectl cluster-admin)."
+}
+
+variable "ci_infra_role_arn" {
+  type        = string
+  default     = ""
+  description = "ARN of the CI OIDC role that runs tofu apply. Added as a stable cluster-admin access entry to avoid cluster_creator_admin churn."
+}

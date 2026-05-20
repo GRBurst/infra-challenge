@@ -1,7 +1,10 @@
+data "aws_caller_identity" "this" {}
+
 locals {
   # Must match modules/platform local.cluster_name = "${namespace}-${environment}-eks".
   # Duplicated here because Terraform providers cannot reference module outputs.
-  cluster_name = "hm-dev-eks"
+  cluster_name      = "hm-dev-eks"
+  cluster_admin_arn = "arn:aws:iam::${data.aws_caller_identity.this.account_id}:role/${local.cluster_name}-cluster-admin"
 }
 
 provider "aws" {
@@ -31,6 +34,7 @@ provider "helm" {
         "eks", "get-token",
         "--cluster-name", local.cluster_name,
         "--region", "eu-central-1",
+        "--role-arn", local.cluster_admin_arn,
       ]
     }
   }
@@ -46,6 +50,7 @@ provider "kubernetes" {
       "eks", "get-token",
       "--cluster-name", local.cluster_name,
       "--region", "eu-central-1",
+      "--role-arn", local.cluster_admin_arn,
     ]
   }
 }

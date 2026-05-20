@@ -36,3 +36,12 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.httpGet.path
           value: /healthz
+  - it: enforces a CPU limit
+    asserts:
+      - isNotNullOrEmpty:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+  - it: CPU limit defaults to 500m
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: 500m

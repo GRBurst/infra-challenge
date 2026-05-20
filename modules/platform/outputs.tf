@@ -31,3 +31,13 @@ output "cluster_admin_role_arn" {
   value       = var.create && length(var.cluster_admin_arns) > 0 ? aws_iam_role.cluster_admin[0].arn : ""
   description = "Assume this role for kubectl access: aws eks update-kubeconfig --role-arn <this>"
 }
+
+output "cluster_admin_arns" {
+  description = "Echoes input for testability."
+  value       = var.cluster_admin_arns
+}
+
+output "console_admin_role_arn" {
+  value       = var.create && length(var.console_admin_arns) > 0 ? aws_iam_role.console_admin[0].arn : ""
+  description = "Assume this role for AWS EKS console access."
+}

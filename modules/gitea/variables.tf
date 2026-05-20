@@ -9,12 +9,6 @@ variable "chart_version" {
   description = "Pinned upstream Gitea Helm chart version (https://dl.gitea.com/charts/)."
 }
 
-variable "values_file" {
-  type        = string
-  description = "Absolute path to a Helm values file. Empty -> use the module's values.yaml."
-  default     = ""
-}
-
 variable "service_port" {
   type        = number
   description = "In-cluster gitea-http service port (must match service.http.port in values)."

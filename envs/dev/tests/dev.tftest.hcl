@@ -25,7 +25,8 @@ mock_provider "kubernetes" {}
 # create_platform=false skips EKS/VPC resource creation so mock providers work.
 # Tests still verify gitops wiring and local variable values.
 variables {
-  create_platform = false
+  create_platform    = false
+  cluster_admin_arns = []
 }
 
 run "providers_cluster_name_matches_formula" {
@@ -37,7 +38,6 @@ run "providers_cluster_name_matches_formula" {
       dynamodb_table_name = "hm-dev-tofu-locks"
       ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
       ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
-      ci_role_arn         = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
     }
   }
   assert {
@@ -55,7 +55,6 @@ run "gitops_module_tracks_challenge_branch" {
       dynamodb_table_name = "hm-dev-tofu-locks"
       ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
       ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
-      ci_role_arn         = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
     }
   }
   assert {
@@ -73,7 +72,6 @@ run "gitops_module_uses_github_repo_url" {
       dynamodb_table_name = "hm-dev-tofu-locks"
       ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
       ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
-      ci_role_arn         = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
     }
   }
   assert {
@@ -91,7 +89,6 @@ run "ecr_url_is_exported" {
       dynamodb_table_name = "hm-dev-tofu-locks"
       ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
       ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
-      ci_role_arn         = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
     }
   }
   assert {
@@ -109,7 +106,6 @@ run "ecr_registry_host_is_exported" {
       dynamodb_table_name = "hm-dev-tofu-locks"
       ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
       ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
-      ci_role_arn         = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
     }
   }
   assert {
@@ -127,11 +123,33 @@ run "cluster_name_is_exported" {
       dynamodb_table_name = "hm-dev-tofu-locks"
       ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
       ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
-      ci_role_arn         = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
     }
   }
   assert {
     condition     = output.cluster_name != null
     error_message = "cluster_name must be a top-level output (derives from local.cluster_name = hm-dev-eks)."
+  }
+}
+
+run "cluster_admin_arns_flows_to_platform" {
+  command = plan
+  variables {
+    cluster_admin_arns = ["arn:aws:iam::111111111111:user/reviewer"]
+  }
+  override_module {
+    target = module.bootstrap
+    outputs = {
+      s3_bucket_name      = "hm-dev-tofu-state-123456789012"
+      dynamodb_table_name = "hm-dev-tofu-locks"
+      ci_app_role_arn     = "arn:aws:iam::123456789012:role/hm-dev-ci-app-role"
+      ci_infra_role_arn   = "arn:aws:iam::123456789012:role/hm-dev-github-oidc-role"
+    }
+  }
+  assert {
+    condition = contains(
+      module.platform.cluster_admin_arns,
+      "arn:aws:iam::111111111111:user/reviewer"
+    )
+    error_message = "envs/dev must surface cluster_admin_arns as an input variable."
   }
 }

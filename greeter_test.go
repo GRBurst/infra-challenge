@@ -115,6 +115,14 @@ func TestHelloServerSetsXHelloTagHeader(t *testing.T) {
 	}
 }
 
+func TestGetIPFromRequestFallsBackToRemoteAddr(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	if got, want := GetIPFromRequest(req), "127.0.0.1:1234"; got != want {
+		t.Fatalf("GetIPFromRequest = %q, want %q", got, want)
+	}
+}
+
 func assertBody(t *testing.T, res *http.Response, want string) {
 	t.Helper()
 

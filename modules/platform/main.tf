@@ -79,20 +79,46 @@ module "eks" {
   endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 
   authentication_mode                      = "API"
-  enable_cluster_creator_admin_permissions = true
+  enable_cluster_creator_admin_permissions = false
 
-  access_entries = length(aws_iam_role.cluster_admin) > 0 ? {
-    cluster_admin = {
-      kubernetes_groups = []
-      principal_arn     = aws_iam_role.cluster_admin[0].arn
-      policy_associations = {
-        admin = {
-          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-          access_scope = { type = "cluster" }
+  access_entries = merge(
+    length(aws_iam_role.cluster_admin) > 0 ? {
+      cluster_admin = {
+        kubernetes_groups = []
+        principal_arn     = aws_iam_role.cluster_admin[0].arn
+        policy_associations = {
+          admin = {
+            policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+            access_scope = { type = "cluster" }
+          }
         }
       }
-    }
-  } : {}
+    } : {},
+    length(aws_iam_role.console_admin) > 0 ? {
+      console_admin = {
+        kubernetes_groups = []
+        principal_arn     = aws_iam_role.console_admin[0].arn
+        policy_associations = {
+          admin = {
+            policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+            access_scope = { type = "cluster" }
+          }
+        }
+      }
+    } : {},
+    var.ci_infra_role_arn != "" ? {
+      ci_infra = {
+        kubernetes_groups = []
+        principal_arn     = var.ci_infra_role_arn
+        policy_associations = {
+          admin = {
+            policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+            access_scope = { type = "cluster" }
+          }
+        }
+      }
+    } : {}
+  )
 
   addons = {
     # Versions verified at plan-authoring time via aws eks describe-addon-versions --kubernetes-version 1.35.
@@ -134,6 +160,78 @@ resource "aws_iam_role" "cluster_admin" {
   })
 
   tags = module.label.tags
+}
+
+resource "aws_iam_role_policy" "cluster_admin_eks_console" {
+  count = var.create && length(var.cluster_admin_arns) > 0 ? 1 : 0
+  name  = "eks-console-access-ro"
+  role  = aws_iam_role.cluster_admin[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "eks:DescribeCluster",
+        "eks:ListClusters",
+        "eks:DescribeNodegroup",
+        "eks:ListNodegroups",
+        "eks:ListFargateProfiles",
+        "eks:DescribeFargateProfile",
+        "eks:ListAccessEntries",
+        "eks:DescribeAccessEntry",
+        "eks:ListAssociatedAccessPolicies",
+        "eks:ListAddons",
+        "eks:DescribeAddon",
+        "eks:DescribeClusterVersions",
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_iam_role" "console_admin" {
+  count = var.create && length(var.console_admin_arns) > 0 ? 1 : 0
+  name  = "${local.cluster_name}-console-admin"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { AWS = var.console_admin_arns }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = module.label.tags
+}
+
+resource "aws_iam_role_policy" "console_admin_eks_console" {
+  count = var.create && length(var.console_admin_arns) > 0 ? 1 : 0
+  name  = "eks-console-access-ro"
+  role  = aws_iam_role.console_admin[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "eks:DescribeCluster",
+        "eks:ListClusters",
+        "eks:DescribeNodegroup",
+        "eks:ListNodegroups",
+        "eks:ListFargateProfiles",
+        "eks:DescribeFargateProfile",
+        "eks:ListAccessEntries",
+        "eks:DescribeAccessEntry",
+        "eks:ListAssociatedAccessPolicies",
+        "eks:ListAddons",
+        "eks:DescribeAddon",
+        "eks:DescribeClusterVersions",
+      ]
+      Resource = "*"
+    }]
+  })
 }
 
 resource "aws_ecr_repository" "greeter" {

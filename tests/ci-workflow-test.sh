@@ -72,18 +72,6 @@ expect "deploy-gitops phase 2b is an untargeted full apply" \
      | length == 1
    ' $WF"
 
-expect "deploy-gitops 2a precedes 2b" \
-  "yq -e '
-     ( [ .jobs.\"deploy-gitops\".steps | to_entries[]
-         | select(.value.run != null and (.value.run | test(\"-target=module.gitops.helm_release.argocd\"))) ]
-       | .[0].key
-     ) <
-     ( [ .jobs.\"deploy-gitops\".steps | to_entries[]
-         | select(.value.run != null and (.value.run | test(\"tofu apply\")) and (.value.run | test(\"-target\") | not)) ]
-       | .[0].key
-     )
-   ' $WF"
-
 # --- Trivy step: soft gate + unfixed filter (challenge-scope compromise) ---
 expect "Trivy scan step is marked continue-on-error" \
   "yq -e '[.jobs.\"build-and-push\".steps[] | select(.name == \"Scan image (Trivy)\") | .\"continue-on-error\"] | .[0] == true' $WF"

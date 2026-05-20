@@ -85,23 +85,14 @@ run "ecr_repository_name_follows_convention" {
   }
 }
 
-# ECR immutability and scan are hardcoded constants in main.tf; verified via code review.
-# Resource attributes can only be tested with create=true which triggers EKS v21 mock
-# provider limitations. These configurations are enforced at plan-time for real applies.
-
-run "ecr_image_tag_immutability_enabled" {
+# ECR resource attributes (IMMUTABLE, scan_on_push) are hardcoded constants in
+# main.tf; mock providers cannot evaluate them with create=true. This test
+# only asserts that the label feeding the resource is well-formed.
+run "ecr_label_is_non_empty" {
   command = plan
   assert {
     condition     = module.ecr_label.id != ""
-    error_message = "ECR label must be non-empty (immutability is hardcoded IMMUTABLE in main.tf)."
-  }
-}
-
-run "ecr_scan_on_push_enabled" {
-  command = plan
-  assert {
-    condition     = module.ecr_label.id != ""
-    error_message = "ECR label must be non-empty (scan_on_push is hardcoded true in main.tf)."
+    error_message = "ECR label must be non-empty."
   }
 }
 
