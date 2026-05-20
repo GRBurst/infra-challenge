@@ -33,7 +33,7 @@ is really required for a minmal setup:
 ## Prerequisites
 
 All tools are provided by the [Nix](https://nixos.org/) dev shell. With Nix
-installed, run:
+installed and git initialized (see Note), run:
 
 ```sh
 nix develop
@@ -50,7 +50,8 @@ commands. This is heavily used to centralize all scripting parts.
 
 > Note: This is a nix flake setup. It requires an initialized git repository to
 > work and a flake support enabled, see
-> [Flakes](https://nixos.wiki/wiki/flakes).
+> [Flakes](https://nixos.wiki/wiki/flakes). A simple git init and a potential
+> first init commit should suffice.
 
 ### Quick app test (no infrastructure)
 
@@ -121,7 +122,7 @@ repo, and applies the ArgoCD Application CR. Takes a few minutes on first run.
 Once ready:
 
 | Service | URL | Credentials |
-| ------- | -------------------------------------------------- | ---------------------------- |
+| ------- | -------------------------------------------------- | ------------------------------------------------ |
 | Greeter | <http://localhost:8081/> | --- |
 | Gitea | <http://localhost:3000> | gitea-admin / gitea-admin (hardcoded local-only) |
 | ArgoCD | run `just argocd-ui`, then <http://localhost:8080> | admin / (printed by command) |
