@@ -102,7 +102,7 @@ run "hello_tag_parameter_omitted_for_dev" {
     target_revision = "main"
   }
   assert {
-    condition     = length(kubernetes_manifest.application[0].manifest.spec.source.helm.parameters) == 0
-    error_message = "For dev env, Helm parameters must be empty so values-dev.yaml is the single source of truth for helloTag."
+    condition     = kubernetes_manifest.application[0].manifest.spec.source.helm.parameters == null
+    error_message = "For dev env, Helm parameters must be null (omitted) so values-dev.yaml is the single source of truth for helloTag."
   }
 }
