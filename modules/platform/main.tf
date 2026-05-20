@@ -156,7 +156,24 @@ module "eks" {
       max_size       = var.node_group_max_size
       desired_size   = var.node_group_desired_size
       subnet_ids     = module.vpc.private_subnets
+      timeouts = {
+        create = "90m"
+        delete = "60m"
+      }
     }
+  }
+
+  # Provider default for cluster create is 25m, which EKS regularly approaches.
+  # Addon create default is 20m; amazon-cloudwatch-observability is known slow.
+  timeouts = {
+    create = "40m"
+    delete = "30m"
+  }
+
+  addons_timeouts = {
+    create = "30m"
+    update = "30m"
+    delete = "60m"
   }
 
   tags = module.label.tags
