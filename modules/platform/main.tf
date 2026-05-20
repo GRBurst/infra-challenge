@@ -30,6 +30,8 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   cluster_name = module.cluster_label.id
   azs          = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -269,24 +271,36 @@ resource "aws_iam_role_policy" "cluster_admin_eks_console" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "eks:DescribeCluster",
-        "eks:ListClusters",
-        "eks:DescribeNodegroup",
-        "eks:ListNodegroups",
-        "eks:ListFargateProfiles",
-        "eks:DescribeFargateProfile",
-        "eks:ListAccessEntries",
-        "eks:DescribeAccessEntry",
-        "eks:ListAssociatedAccessPolicies",
-        "eks:ListAddons",
-        "eks:DescribeAddon",
-        "eks:DescribeClusterVersions",
-      ]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:AccessKubernetesApi",
+          "eks:DescribeCluster",
+          "eks:ListClusters",
+          "eks:DescribeNodegroup",
+          "eks:ListNodegroups",
+          "eks:ListUpdates",
+          "eks:ListFargateProfiles",
+          "eks:DescribeFargateProfile",
+          "eks:ListAccessEntries",
+          "eks:DescribeAccessEntry",
+          "eks:ListAssociatedAccessPolicies",
+          "eks:ListAddons",
+          "eks:DescribeAddon",
+          "eks:DescribeAddonVersions",
+          "eks:DescribeClusterVersions",
+          "eks:ListIdentityProviderConfigs",
+          "iam:ListRoles",
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ssm:GetParameter"
+        Resource = "arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:parameter/*"
+      },
+    ]
   })
 }
 
@@ -322,24 +336,36 @@ resource "aws_iam_role_policy" "console_admin_eks_console" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "eks:DescribeCluster",
-        "eks:ListClusters",
-        "eks:DescribeNodegroup",
-        "eks:ListNodegroups",
-        "eks:ListFargateProfiles",
-        "eks:DescribeFargateProfile",
-        "eks:ListAccessEntries",
-        "eks:DescribeAccessEntry",
-        "eks:ListAssociatedAccessPolicies",
-        "eks:ListAddons",
-        "eks:DescribeAddon",
-        "eks:DescribeClusterVersions",
-      ]
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:AccessKubernetesApi",
+          "eks:DescribeCluster",
+          "eks:ListClusters",
+          "eks:DescribeNodegroup",
+          "eks:ListNodegroups",
+          "eks:ListUpdates",
+          "eks:ListFargateProfiles",
+          "eks:DescribeFargateProfile",
+          "eks:ListAccessEntries",
+          "eks:DescribeAccessEntry",
+          "eks:ListAssociatedAccessPolicies",
+          "eks:ListAddons",
+          "eks:DescribeAddon",
+          "eks:DescribeAddonVersions",
+          "eks:DescribeClusterVersions",
+          "eks:ListIdentityProviderConfigs",
+          "iam:ListRoles",
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ssm:GetParameter"
+        Resource = "arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:parameter/*"
+      },
+    ]
   })
 }
 

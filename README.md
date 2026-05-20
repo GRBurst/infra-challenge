@@ -233,6 +233,23 @@ kubectl get pods -n greeter
 This role is stable across CI re-applies because it is an explicit EKS access
 entry, independent of who ran `tofu apply`.
 
+#### IAM roles
+
+Two stable IAM roles are created by the platform module for human access:
+
+| Role | Who can assume it | Purpose |
+| --- | --- | --- |
+| `{cluster}-cluster-admin` | Principals in `cluster_admin_arns` + `ci_infra_role_arn` | `kubectl` access and AWS console resource viewing |
+| `{cluster}-console-admin` | Principals in `console_admin_arns` | AWS console resource viewing |
+
+Both roles have:
+
+- **IAM**: `eks:AccessKubernetesApi` and supporting EKS/IAM/SSM read actions required for the console Resources tab
+- **IAM**: `AmazonEC2ReadOnlyAccess` so the console can show node instance details
+- **Kubernetes**: EKS access entry associated with `AmazonEKSClusterAdminPolicy` (cluster-admin equivalent)
+
+To view Kubernetes resources in the AWS console, switch to the `{cluster}-cluster-admin` role in the console role switcher, then navigate to **EKS → cluster → Resources**.
+
 ### ArgoCD
 
 ArgoCD runs inside the cluster with no public endpoint. Access it via
