@@ -173,6 +173,9 @@ credentials with OAuth cached. OpenTofu's backend engine for the state does not
 understand this yet. I was surprised by this myself. When provided with a sso
 setup and using `aws sso login`, you might not run into this limitation.
 
+> Note: I did not setup mfa for my account, but you should for real cloud
+> setups.
+
 **2. Provision infrastructure**
 
 ```sh
