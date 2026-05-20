@@ -194,18 +194,18 @@ gh variable set CI_INFRA_ROLE_ARN  --env dev --body "$(cd envs/dev && tofu outpu
 ```
 
 These are not secrets, but IAM role ARNs and ECR URLs. After this step, push to
-the `challenge` branch and CI takes over.
+the `main` branch and CI takes over.
 
 ### CI/CD pipeline
 
-Every push to `challenge` runs four jobs:
+Every push to `main` runs four jobs:
 
 | Job | Triggered by | What it does |
 | ----------------- | ---------------------------- | ----------------------------------------------------------------------- |
 | `check` | all branches | fmt, lint, tflint, security scan, OpenTofu + Helm + Go tests |
-| `build-and-push` | `challenge` branch | Nix build → Trivy scan → push to ECR → commit updated `values-dev.yaml` |
-| `deploy-platform` | `challenge` (after check) | `tofu apply` for bootstrap + platform modules |
-| `deploy-gitops` | `challenge` (after platform) | two-phase apply: ArgoCD Helm release, then Application CRs |
+| `build-and-push` | `main` branch | Nix build → Trivy scan → push to ECR → commit updated `values-dev.yaml` |
+| `deploy-platform` | `main` (after check) | `tofu apply` for bootstrap + platform modules |
+| `deploy-gitops` | `main` (after platform) | two-phase apply: ArgoCD Helm release, then Application CRs |
 
 Runs on ubuntu latest with nix.
 
@@ -249,7 +249,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d
 ```
 
-ArgoCD polls the `challenge` branch of this repository every 3 minutes. The
+ArgoCD polls the `main` branch of this repository every 3 minutes. The
 Application is configured with `automated.prune = true` and `selfHeal = true` -
 any drift is corrected automatically.
 
@@ -317,7 +317,7 @@ A typical change:
 1. Edit `greeter.go`, `charts/greeter/`, or infrastructure modules.
 2. `just check` - runs fmt + lint + validate + tflint locally.
 3. `just test-all` - full test suite (no network required; uses mock providers).
-4. Commit and push to `challenge`.
+4. Commit and push to `main`.
 5. CI runs `check`, then `build-and-push` (new image + updated
    `values-dev.yaml`).
 6. ArgoCD detects the values commit within 3 minutes and rolls out the new

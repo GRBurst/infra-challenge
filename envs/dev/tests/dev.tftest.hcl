@@ -50,8 +50,11 @@ run "providers_cluster_name_matches_formula" {
   }
 }
 
-run "gitops_module_tracks_challenge_branch" {
+run "gitops_module_target_revision_flows_through" {
   command = plan
+  variables {
+    target_revision = "sentinel-branch-wiring-test"
+  }
   override_module {
     target = module.bootstrap
     outputs = {
@@ -62,8 +65,8 @@ run "gitops_module_tracks_challenge_branch" {
     }
   }
   assert {
-    condition     = module.gitops.application_target_revision == "challenge"
-    error_message = "gitops module target_revision must be 'challenge' for dev (temporary; revert when merging to main)."
+    condition     = module.gitops.application_target_revision == "sentinel-branch-wiring-test"
+    error_message = "target_revision variable must flow through to the gitops module's targetRevision."
   }
 }
 

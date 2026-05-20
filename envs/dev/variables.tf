@@ -56,5 +56,5 @@ variable "console_admin_arns" {
 variable "target_revision" {
   type        = string
   description = "Git ref ArgoCD tracks for the dev environment."
-  default     = "challenge"
+  default     = "main"
 }

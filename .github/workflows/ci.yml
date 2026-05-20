@@ -7,7 +7,7 @@ on:
   pull_request:
 env:
   # Deploy branch: change this (and target_revision in envs/dev/terraform.tfvars) to switch.
-  DEPLOY_BRANCH: challenge
+  DEPLOY_BRANCH: main
 jobs:
   config:
     runs-on: ubuntu-latest
