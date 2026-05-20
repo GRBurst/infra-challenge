@@ -1,0 +1,485 @@
+# justfile - OpenTofu infrastructure helper commands
+# Requires: https://github.com/casey/just
+
+set dotenv-load := false
+set export := true
+
+PLAN := env_var_or_default("PLAN", "plan.tfplan")
+ARGS := env_var_or_default("ARGS", "")
+
+repo_root := justfile_directory()
+
+default:
+  @just --list
+
+# ============================================================
+# Format
+# ============================================================
+
+# Check: OpenTofu formatting
+fmt-tofu-check:
+  tofu fmt -check -recursive
+
+# Fix: OpenTofu formatting
+fmt-tofu:
+  tofu fmt -recursive
+
+# Check: Nix formatting (treefmt --ci)
+fmt-nix-check:
+  treefmt --ci
+
+# Fix: Nix formatting
+fmt-nix:
+  treefmt
+
+# Check: YAML formatting
+fmt-yaml-check:
+  yamlfmt -gitignore_excludes -exclude 'refs/**/*' -exclude 'charts/greeter/templates/**' -lint -dstar '**/*.{yml,yaml}'
+
+# Fix: YAML formatting
+fmt-yaml:
+  yamlfmt -gitignore_excludes -exclude 'refs/**/*' -exclude 'charts/greeter/templates/**' -dstar '**/*.{yml,yaml}'
+
+# Check: Markdown formatting
+fmt-md-check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  git ls-files -z -- '*.md' ':(exclude)refs/**' \
+    | xargs -0 --no-run-if-empty mdformat --number --check
+
+# Fix: Markdown formatting
+fmt-md:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  git ls-files -z -- '*.md' ':(exclude)refs/**' \
+    | xargs -0 --no-run-if-empty mdformat --number
+
+# Check: all formatting (CI equivalent)
+fmt-check: fmt-tofu-check fmt-nix-check fmt-yaml-check fmt-md-check
+
+# Fix: all formatting
+fmt: fmt-tofu fmt-nix fmt-yaml fmt-md
+
+# ============================================================
+# Lint
+# ============================================================
+
+# Check: trailing whitespace, merge conflicts, CRLF, private keys, EOF newlines
+lint-core:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  fail=0
+
+  echo "--- Trailing whitespace ---"
+  if git ls-files -z | grep -zvE 'snap_test.*\.py$' \
+      | xargs -0 grep -InE '[[:blank:]]$' 2>/dev/null; then
+    echo "FAIL: trailing whitespace found"; fail=1
+  fi
+
+  echo "--- Merge conflicts ---"
+  if git ls-files -z | xargs -0 grep -In '^<<<<<<< ' 2>/dev/null; then
+    echo "FAIL: merge conflict markers found"; fail=1
+  fi
+
+  echo "--- CRLF line endings ---"
+  if git ls-files -z | xargs -0 grep -IPn '\r$' 2>/dev/null; then
+    echo "FAIL: CRLF line endings found"; fail=1
+  fi
+
+  echo "--- Private keys ---"
+  if git ls-files -z | xargs -0 grep -InE 'BEGIN (RSA|DSA|EC|OPENSSH|PRIVATE) KEY' 2>/dev/null; then
+    echo "FAIL: private key detected"; fail=1
+  fi
+
+  echo "--- EOF newlines ---"
+  while IFS= read -r f; do
+    if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l)" -eq 0 ]; then
+      echo "Missing EOF newline: $f"; fail=1
+    fi
+  done < <(git ls-files)
+
+  [ "$fail" -eq 0 ] || exit 1
+  echo "All core checks passed."
+
+# Fix: trailing whitespace and missing EOF newlines (auto-fixable)
+lint-core-fix:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "--- Fixing trailing whitespace ---"
+  git ls-files -z | grep -zvE 'snap_test.*\.py$' \
+    | xargs -0 sed -i 's/[[:blank:]]*$//' || true
+
+  echo "--- Fixing CRLF line endings ---"
+  git ls-files -z | xargs -0 sed -i 's/\r$//' || true
+
+  echo "--- Fixing missing EOF newlines ---"
+  while IFS= read -r f; do
+    if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l)" -eq 0 ]; then
+      echo "" >> "$f"
+      echo "Fixed: $f"
+    fi
+  done < <(git ls-files)
+
+  echo "Done. Re-run lint-core to verify."
+
+# Check: YAML lint
+lint-yaml:
+  yamllint .
+
+# Check: GitHub Actions workflow schema
+lint-actions:
+  actionlint .github/workflows/ci.yml
+
+# Check: all lint checks (core + yaml + actions)
+lint: lint-core lint-yaml lint-actions
+
+# Fix: all auto-fixable lint issues
+lint-fix: lint-core-fix
+
+# ============================================================
+# Validate
+# ============================================================
+
+# Validate all environments that contain Terraform configuration
+validate:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  while IFS= read -r dir; do
+    echo "--- Validating $dir ---"
+    (cd "$dir" && tofu init -backend=false -input=false -no-color && tofu validate -no-color)
+  done < <(find envs -name 'main.tf' -not -path '*/.terraform/*' -exec dirname {} \; | sort)
+
+# Run TFLint across the repository
+tflint:
+  tflint --init --config "{{repo_root}}/.tflint.hcl"
+  tflint --chdir=envs --recursive --config "{{repo_root}}/.tflint.hcl" --call-module-type=local
+  tflint --chdir=modules --recursive --config "{{repo_root}}/.tflint.hcl"
+
+# ============================================================
+# Security
+# ============================================================
+
+# Run Trivy IaC security scan
+security:
+  trivy config .
+
+# ============================================================
+# Test
+# ============================================================
+
+# Run OpenTofu native tests for every module/env that has tests/*.tftest.hcl
+test:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  fail=0
+  while IFS= read -r tests_dir; do
+    module_dir=$(dirname "$tests_dir")
+    echo "--- Testing $module_dir ---"
+    if ! (cd "$module_dir" && tofu init -backend=false -input=false -no-color 2>&1); then
+      echo "SKIP: $module_dir (init failed - missing credentials or network access)"
+      continue
+    fi
+    (cd "$module_dir" && tofu test -no-color) || fail=1
+  done < <(find modules envs -type d -name tests -not -path '*/.terraform/*' | sort -u)
+  exit "$fail"
+
+# Run Go tests
+test-go:
+  GO111MODULE=off go test -v ./services/greeter/
+
+# Run Helm lint and unit tests
+test-chart:
+  helm lint charts/greeter
+  helm unittest charts/greeter
+
+# Run OpenTofu tests for gitops module and local env
+test-tofu:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  echo "--- Testing modules/gitops ---"
+  (cd modules/gitops && tofu init -backend=false -input=false -no-color && tofu test -no-color)
+  echo "--- Testing envs/local ---"
+  (cd envs/local && tofu init -backend=false -input=false -no-color && tofu test -no-color)
+
+# Run all tests: Go, Helm, OpenTofu, and static checks
+test-all: test-go test-chart test test-local-scripts
+
+# ============================================================
+# Local dev lifecycle
+# ============================================================
+
+# Bring up local k3d cluster (with Gitea + ArgoCD tracking current branch)
+dev-up:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  CTX="k3d-infra-challenge"
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [[ "$branch" == "HEAD" ]]; then
+    echo "ERROR: detached HEAD; checkout a branch first." >&2; exit 1
+  fi
+  if ! k3d cluster list | grep -q infra-challenge; then
+    k3d cluster create --config envs/local/cluster/k3d-config.yaml
+    rm -f "{{repo_root}}/envs/local/terraform.tfstate" "{{repo_root}}/envs/local/terraform.tfstate.backup"
+  else
+    k3d cluster start infra-challenge 2>/dev/null || true
+  fi
+  until curl -sf http://registry.localhost:5001/v2/ >/dev/null 2>&1; do sleep 1; done
+  just dev-image
+
+  echo "==> Deploying Gitea + ArgoCD..."
+  cd "{{repo_root}}/envs/local" && \
+    tofu init && \
+    tofu apply -auto-approve -var "greeter_branch=$branch" -var "create_apps=false"
+  # Assert Gitea is actually healthy before proceeding - fail loudly if not
+  kubectl --context "$CTX" -n gitea rollout status deployment/gitea --timeout=300s
+  kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
+
+  echo "==> Bootstrapping Gitea repo..."
+  cd "{{repo_root}}" && bash envs/local/cluster/scripts/seed-gitea-repo.sh
+
+  echo "==> Applying Application CR..."
+  cd "{{repo_root}}/envs/local" && \
+    tofu apply -auto-approve -var "greeter_branch=$branch"
+
+  echo
+  echo "=== Local stack ready ==="
+  echo "  Greeter:   http://localhost:8081/"
+  echo "  Gitea:     http://localhost:3000  (gitea-admin / gitea-admin)"
+  echo "  ArgoCD:    run 'just argocd-ui' then open http://localhost:8080"
+  echo "  Branch:    $branch"
+  echo "  Check:     just dev-check"
+
+# Build and push greeter image to local registry
+dev-image:
+  nix build .#dockerImage
+  docker load < result
+  docker tag greeter:latest registry.localhost:5001/greeter:local
+  docker push registry.localhost:5001/greeter:local
+
+# Install/upgrade greeter chart directly (without ArgoCD sync)
+dev-deploy:
+  helm upgrade --install greeter charts/greeter \
+    -f charts/greeter/values-local.yaml \
+    -n greeter --create-namespace \
+    --kube-context k3d-infra-challenge
+
+# Run smoke tests against local cluster
+dev-test:
+  bash envs/local/cluster/scripts/smoke-test.sh
+
+# Assert all local components are healthy (Gitea, ArgoCD, greeter)
+dev-check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  CTX="k3d-infra-challenge"
+  echo "--- Gitea ---"
+  kubectl --context "$CTX" -n gitea rollout status deployment/gitea --timeout=60s
+  kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
+  echo "  gitea-http service: OK"
+  echo "--- ArgoCD ---"
+  kubectl --context "$CTX" -n argocd rollout status deployment/argocd-server --timeout=60s
+  echo "--- Greeter ---"
+  kubectl --context "$CTX" -n greeter rollout status deployment/greeter --timeout=120s
+  echo "--- ArgoCD sync ---"
+  sync_status="$(kubectl --context "$CTX" -n argocd get app greeter \
+    -o jsonpath='{.status.sync.status}' 2>/dev/null || echo 'Unknown')"
+  health_status="$(kubectl --context "$CTX" -n argocd get app greeter \
+    -o jsonpath='{.status.health.status}' 2>/dev/null || echo 'Unknown')"
+  echo "  sync=$sync_status health=$health_status"
+  [[ "$sync_status" == "Synced" ]] || { echo "FAIL: app not Synced"; exit 1; }
+  [[ "$health_status" == "Healthy" ]] || { echo "FAIL: app not Healthy"; exit 1; }
+  echo "All components healthy."
+
+# Tear down local k3d cluster
+dev-down:
+  k3d cluster delete infra-challenge
+  rm -f "{{repo_root}}/envs/local/terraform.tfstate" "{{repo_root}}/envs/local/terraform.tfstate.backup"
+
+# ============================================================
+# Gitea workflow (in-cluster GitOps)
+# ============================================================
+
+# Force-push current branch to Gitea (idempotent)
+seed-gitea-repo:
+  bash envs/local/cluster/scripts/seed-gitea-repo.sh
+
+# Force ArgoCD to re-evaluate immediately after `git push gitea`
+gitea-sync:
+  kubectl --context k3d-infra-challenge -n argocd \
+    annotate app greeter argocd.argoproj.io/refresh=hard --overwrite
+
+# Print ArgoCD port-forward command and initial admin password
+argocd-ui:
+  @echo "kubectl --context k3d-infra-challenge port-forward svc/argocd-server -n argocd 8080:80"
+  @echo "Initial admin password:"
+  @kubectl --context k3d-infra-challenge -n argocd get secret argocd-initial-admin-secret \
+    -o jsonpath='{.data.password}' | base64 -d
+  @echo
+
+# Static-check seed-gitea-repo.sh and smoke-test.sh
+test-local-scripts:
+  shellcheck envs/local/cluster/scripts/seed-gitea-repo.sh
+  shellcheck envs/local/cluster/scripts/smoke-test.sh
+  bash -n envs/local/cluster/scripts/seed-gitea-repo.sh
+  bash -n envs/local/cluster/scripts/smoke-test.sh
+  ! grep -nE '^\s*sleep [0-9]+\s*$' envs/local/cluster/scripts/smoke-test.sh
+
+# Assert no forbidden artifacts exist at repo root
+test-repo-hygiene:
+  bash tests/repo-hygiene-test.sh
+
+# Assert every tests/ directory is covered by test-all
+test-coverage:
+  bash tests/test-coverage-test.sh
+
+# Assert README variable table matches variables.tf
+test-readme-vars:
+  bash tests/readme-vars-test.sh
+
+# Assert all versions.tf use ~> pessimistic constraints
+test-version-pins:
+  bash tests/version-pins-test.sh
+
+# Assert no deprecated outputs are referenced
+test-no-deprecated:
+  bash tests/no-deprecated-outputs-test.sh
+
+# ============================================================
+# Dev environment (AWS EKS)
+# ============================================================
+
+# Stage 1: provision VPC + EKS + ECR (provider chicken-and-egg solution)
+dev-infra-up:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  tofu init
+  tofu apply -target=module.bootstrap -auto-approve
+  tofu apply -target=module.platform  -auto-approve
+  echo "==> VPC + EKS + ECR + IAM provisioned."
+  echo "    Cluster:        $(tofu output -raw cluster_name)"
+  echo "    ECR URL:        $(tofu output -raw ecr_repository_url)"
+  echo "    ECR registry:   $(tofu output -raw ecr_registry_host)"
+  echo "    Next:           just dev-gitops-up"
+
+# Stage 2: deploy ArgoCD + Application CRs (requires EKS from stage 1)
+dev-gitops-up:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  # Phase 1: install ArgoCD and its CRDs before planning the full state.
+  # kubernetes_manifest validates AppProject/Application against the live API at plan
+  # time; the CRDs must exist first (hashicorp/kubernetes issue #2597).
+  tofu apply -target=module.gitops.helm_release.argocd -auto-approve
+  # Phase 2: apply AppProject + Application CRs.  Targeting module.gitops keeps
+  # this stage from touching bootstrap/platform resources if the state is partial.
+  tofu apply -target=module.gitops -auto-approve
+  echo "==> ArgoCD deployed. Sync begins within 3 minutes."
+
+# Configure kubectl to access the dev EKS cluster via the cluster-admin role
+dev-kubeconfig:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  ROLE_ARN="$(tofu output -raw cluster_admin_role_arn)"
+  CLUSTER="$(tofu output -raw cluster_name)"
+  [[ -n "$ROLE_ARN" ]] || { echo "ERROR: cluster_admin_role_arn is empty - run dev-infra-up first"; exit 1; }
+  aws eks update-kubeconfig \
+    --name "$CLUSTER" \
+    --region eu-central-1 \
+    --role-arn "$ROLE_ARN" \
+    --alias "$CLUSTER"
+  echo "==> kubectl context '${CLUSTER}' configured (assumes ${ROLE_ARN})"
+
+# Full teardown (destroy in reverse: gitops → platform → bootstrap)
+dev-infra-down:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}/envs/dev"
+  tofu destroy -target=module.gitops   -auto-approve || true
+  tofu destroy -target=module.platform -auto-approve
+  echo "==> EKS + VPC + ECR destroyed. Bootstrap retained."
+
+# Show dev environment info
+dev-infra-info:
+  cd "{{repo_root}}/envs/dev" && tofu output
+
+# DoD smoke test against deployed AWS greeter
+dev-infra-smoke:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  ENDPOINT="$(kubectl get svc -n greeter greeter -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+  [[ -n "$ENDPOINT" ]] || { echo "No LoadBalancer endpoint yet"; exit 1; }
+  echo "Endpoint: $ENDPOINT"
+  curl -sI "http://$ENDPOINT:8080/"        | grep -i 'X-Hello-Tag'
+  curl -s   "http://$ENDPOINT:8080/version" | jq .
+
+# Check yq is available in devShell
+yq-available:
+  @command -v yq >/dev/null || { echo "yq missing from devShell"; exit 1; }
+
+# ============================================================
+# Aggregated
+# ============================================================
+
+# Run all checks (full CI equivalent)
+check: fmt-check lint validate tflint
+
+# Apply all auto-fixable changes (format + fixable lint)
+fix: fmt lint-fix
+
+# ============================================================
+# Lifecycle
+# ============================================================
+
+# Initialize OpenTofu working directory
+[no-cd]
+init:
+  tofu init {{ARGS}}
+
+# Upgrade providers and modules
+[no-cd]
+upgrade:
+  tofu init -upgrade {{ARGS}}
+
+# Plan infrastructure changes
+[no-cd]
+plan: init
+  tofu plan {{ARGS}}
+
+# Apply infrastructure changes
+[no-cd]
+apply: init
+  @if [ -f "{{PLAN}}" ]; then \
+    tofu apply {{ARGS}} "{{PLAN}}"; \
+  else \
+    tofu apply {{ARGS}}; \
+  fi
+
+# ============================================================
+# State helpers
+# ============================================================
+
+[no-cd]
+outputs:
+  tofu output
+
+[no-cd]
+state-list:
+  tofu state list
+
+[no-cd]
+state-pull:
+  tofu state pull > tofu.tfstate
+
+[no-cd]
+providers:
+  tofu providers
+
+# ============================================================
+# Cleanup
+# ============================================================
+
+clean:
+  @rm -rf .terraform .terraform.lock.hcl "{{PLAN}}"

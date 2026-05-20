@@ -1,0 +1,8 @@
+.direnv
+.debug
+.terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+charts/greeter/tests/__snapshot__/
+result

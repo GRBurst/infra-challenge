@@ -1,0 +1,42 @@
+suite: deployment
+templates:
+  - deployment.yaml
+tests:
+  - it: defaults to 2 replicas
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+  - it: injects HELLO_TAG from values
+    set:
+      helloTag: "sha-deadbeef"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HELLO_TAG
+            value: "sha-deadbeef"
+  - it: enforces readOnlyRootFilesystem
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+  - it: uses local registry when values-local applied
+    values:
+      - ../values-local.yaml
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^registry\.localhost:5001/greeter:'
+  - it: probe paths target /healthz
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+  - it: enforces a CPU limit
+    asserts:
+      - isNotNullOrEmpty:
+          path: spec.template.spec.containers[0].resources.limits.cpu

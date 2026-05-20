@@ -1,0 +1,14 @@
+suite: pdb
+templates:
+  - poddisruptionbudget.yaml
+tests:
+  - it: PDB is enabled by default
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+  - it: PDB is disabled in local values
+    values:
+      - ../values-local.yaml
+    asserts:
+      - hasDocuments:
+          count: 0

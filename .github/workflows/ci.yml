@@ -1,0 +1,181 @@
+# Action versions pinned to commit SHAs for supply-chain integrity.
+# Update via `pinact` tool, which basically does the same as running curl and adding the sha
+# curl -sL "https://api.github.com/repos/<owner>/<repo>/git/ref/tags/<version>" | jq -r .object.sha
+name: ci
+on:
+  push:
+  pull_request:
+env:
+  # Deploy branch: change this (and target_revision in envs/dev/terraform.tfvars) to switch.
+  DEPLOY_BRANCH: main
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_branch: ${{ steps.out.outputs.v }}
+    steps:
+      - id: out
+        run: echo "v=${{ env.DEPLOY_BRANCH }}" >> "$GITHUB_OUTPUT"
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+        with:
+          use-flakehub: false
+      - run: nix develop --command just fmt-check
+      - run: nix develop --command just lint
+      - run: nix develop --command just validate
+      - run: nix develop --command just tflint
+      - run: nix develop --command just security
+      - run: nix develop --command just test
+  build-and-push:
+    needs: [check, config]
+    if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: write
+    env:
+      AWS_REGION: eu-central-1
+      ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+      ECR_REGISTRY_HOST: ${{ vars.ECR_REGISTRY_HOST }}
+      CI_APP_ROLE_ARN: ${{ vars.CI_APP_ROLE_ARN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+        with:
+          use-flakehub: false
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: ${{ env.CI_APP_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Build image
+        run: nix build .#dockerImage
+      - name: Scan image (Trivy)
+        continue-on-error: true
+        run: |
+          docker load < result
+          nix develop --command trivy image \
+            --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed \
+            greeter:latest
+      - name: Push to ECR (idempotent)
+        id: push
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          REPO_NAME="${ECR_REPOSITORY_URL##*/}"
+
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$ECR_REGISTRY_HOST"
+
+          if aws ecr describe-images \
+              --repository-name "$REPO_NAME" \
+              --image-ids imageTag="$IMAGE_TAG" \
+              --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "Image $IMAGE_TAG already exists in ECR — skipping push."
+          else
+            docker tag greeter:latest "$ECR_REPOSITORY_URL:$IMAGE_TAG"
+            docker push "$ECR_REPOSITORY_URL:$IMAGE_TAG"
+          fi
+
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          {
+            echo "IMAGE_TAG=$IMAGE_TAG"
+            echo "BUILD_TIME=$BUILD_TIME"
+            echo "SHORT_SHA=${IMAGE_TAG:0:7}"
+          } >> "$GITHUB_ENV"
+      - name: Update values-dev.yaml
+        run: |
+          nix develop --command yq -i \
+            ".image.repository = \"$ECR_REPOSITORY_URL\" |
+             .image.tag        = \"$IMAGE_TAG\"        |
+             .helloTag         = \"$IMAGE_TAG\"        |
+             .buildTime        = \"$BUILD_TIME\"" \
+            charts/greeter/values-dev.yaml
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add charts/greeter/values-dev.yaml
+          if git diff --staged --quiet; then
+            echo "No values-dev.yaml changes — nothing to commit."
+          else
+            git commit -m "chore: bump greeter to ${SHORT_SHA} [skip ci]"
+            git push
+          fi
+  deploy-platform:
+    needs: [check, config]
+    if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: eu-central-1
+      CI_INFRA_ROLE_ARN: ${{ vars.CI_INFRA_ROLE_ARN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+        with:
+          use-flakehub: false
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: ${{ env.CI_INFRA_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Tofu init
+        working-directory: envs/dev
+        run: nix develop --command tofu init -input=false -no-color
+      - name: Tofu apply (phase 1 — bootstrap + platform)
+        working-directory: envs/dev
+        run: |
+          nix develop --command tofu apply \
+            -target=module.bootstrap \
+            -target=module.platform \
+            -auto-approve -input=false -no-color
+      - name: Print outputs
+        working-directory: envs/dev
+        run: nix develop --command tofu output
+  deploy-gitops:
+    needs: [deploy-platform, config]
+    if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: eu-central-1
+      CI_INFRA_ROLE_ARN: ${{ vars.CI_INFRA_ROLE_ARN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+        with:
+          use-flakehub: false
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: ${{ env.CI_INFRA_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Tofu init
+        working-directory: envs/dev
+        run: nix develop --command tofu init -input=false -no-color
+      - name: Tofu apply (phase 2a — install ArgoCD helm release only)
+        working-directory: envs/dev
+        run: |
+          nix develop --command tofu apply \
+            -target=module.gitops.helm_release.argocd \
+            -auto-approve -input=false -no-color
+      - name: Tofu apply (phase 2b — full, applies AppProject + Application)
+        working-directory: envs/dev
+        run: nix develop --command tofu apply -auto-approve -input=false -no-color
+      - name: Print outputs
+        working-directory: envs/dev
+        run: nix develop --command tofu output

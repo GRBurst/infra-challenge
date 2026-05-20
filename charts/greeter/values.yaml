@@ -1,0 +1,45 @@
+replicaCount: 2
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+helloTag: "unset"
+buildTime: "unset"
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+pdb:
+  enabled: true
+  minAvailable: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+serviceAccount:
+  create: true
+  annotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 65532
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+terminationGracePeriodSeconds: 30
