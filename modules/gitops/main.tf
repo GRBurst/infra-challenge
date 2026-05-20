@@ -48,11 +48,6 @@ resource "kubernetes_manifest" "appproject" {
 resource "kubernetes_manifest" "application" {
   count = var.create_apps ? 1 : 0
 
-  # ArgoCD's CRD defaulting injects forceString into each parameter entry on
-  # every SSA dry-run, causing perpetual drift. Marking as computed tells the
-  # provider to ignore server-side normalization of this field.
-  computed_fields = ["spec.source.helm.parameters"]
-
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
@@ -66,12 +61,13 @@ resource "kubernetes_manifest" "application" {
         repoURL        = var.repo_url
         targetRevision = var.target_revision
         path           = var.greeter_chart_path
-        helm = {
-          valueFiles = [local.values_file]
-          parameters = var.environment == "local" ? [
-            { name = "helloTag", value = "$ARGOCD_APP_REVISION" }
-          ] : null
-        }
+        helm = merge(
+          { valueFiles = [local.values_file] },
+          var.environment == "local" ? {
+            # forceString = false matches ArgoCD's CRD defaulting, preventing drift.
+            parameters = [{ name = "helloTag", value = "$ARGOCD_APP_REVISION", forceString = false }]
+          } : {}
+        )
       }
       destination = {
         server    = "https://kubernetes.default.svc"
