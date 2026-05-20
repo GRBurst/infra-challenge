@@ -37,6 +37,16 @@ output "cluster_admin_arns" {
   value       = var.cluster_admin_arns
 }
 
+output "greeter_log_group" {
+  value       = var.create ? aws_cloudwatch_log_group.greeter[0].name : ""
+  description = "CloudWatch Logs group for greeter application logs (populated by the Fluent Bit DaemonSet)."
+}
+
+output "greeter_alarm_name" {
+  value       = var.create ? aws_cloudwatch_metric_alarm.greeter_downtime[0].alarm_name : ""
+  description = "CloudWatch alarm that fires when the greeter has <1 running container for 2 minutes."
+}
+
 output "console_admin_role_arn" {
   value       = var.create && length(var.console_admin_arns) > 0 ? aws_iam_role.console_admin[0].arn : ""
   description = "Assume this role for AWS EKS console access."

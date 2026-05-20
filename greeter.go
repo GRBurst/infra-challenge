@@ -3,11 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 )
 
 const maxTextInjectionBytes = 256
+
+// logger emits structured JSON to stdout so Fluent Bit / CloudWatch Logs can
+// parse fields without log-line regex. Tests swap this for a buffer.
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 type versionInfo struct {
 	HelloTag  string `json:"helloTag"`
@@ -16,12 +21,14 @@ type versionInfo struct {
 }
 
 func main() {
-	fmt.Println("Hivemind's Go Greeter")
-	fmt.Println("You are running the service with this tag: ", os.Getenv("HELLO_TAG"))
+	logger.Info("greeter_starting", slog.String("hello_tag", os.Getenv("HELLO_TAG")))
 	http.HandleFunc("/", HelloServer)
 	http.HandleFunc("/healthz", HealthzHandler)
 	http.HandleFunc("/version", VersionHandler)
-	http.ListenAndServe(":8080", nil)
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		logger.Error("server_exited", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
 }
 
 func HealthzHandler(w http.ResponseWriter, _ *http.Request) {
@@ -52,7 +59,10 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	fmt.Println(fmtStr)
+	logger.Info("greeting_served",
+		slog.String("client_ip", GetIPFromRequest(r)),
+		slog.String("pod", os.Getenv("HOSTNAME")),
+	)
 	fmt.Fprintln(w, fmtStr)
 }
 

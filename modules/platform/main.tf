@@ -134,6 +134,19 @@ module "eks" {
     vpc-cni = {
       addon_version = "v1.21.1-eksbuild.8"
     }
+    # Required for EKS Pod Identity associations to work - lightweight DaemonSet
+    # that exchanges pod tokens for IAM credentials. Verify version via:
+    # aws eks describe-addon-versions --addon-name eks-pod-identity-agent --kubernetes-version 1.35
+    eks-pod-identity-agent = {
+      addon_version = "v1.3.10-eksbuild.3"
+    }
+    # Deploys Fluent Bit + CloudWatch agent DaemonSets. Container stdout is
+    # shipped to CloudWatch Logs; Container Insights metrics power the downtime
+    # alarm. Access is granted via EKS Pod Identity (see aws_eks_pod_identity_association
+    # below). See README "Observability".
+    amazon-cloudwatch-observability = {
+      addon_version = "v5.4.0-eksbuild.1"
+    }
   }
 
   eks_managed_node_groups = {
@@ -147,6 +160,71 @@ module "eks" {
   }
 
   tags = module.label.tags
+}
+
+# IAM role for the CloudWatch Observability add-on, accessed via EKS Pod Identity.
+# Pod Identity (K8s 1.24+) grants permissions at pod scope rather than node scope.
+resource "aws_iam_role" "cloudwatch_observability" {
+  count = var.create ? 1 : 0
+  name  = "${local.cluster_name}-cloudwatch-observability"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+    }]
+  })
+
+  tags = module.label.tags
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_observability" {
+  count      = var.create ? 1 : 0
+  role       = aws_iam_role.cloudwatch_observability[0].name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# Binds the IAM role to the cloudwatch-agent service account that the add-on
+# creates in the amazon-cloudwatch namespace.
+resource "aws_eks_pod_identity_association" "cloudwatch_observability" {
+  count           = var.create ? 1 : 0
+  cluster_name    = module.eks.cluster_name
+  namespace       = "amazon-cloudwatch"
+  service_account = "cloudwatch-agent"
+  role_arn        = aws_iam_role.cloudwatch_observability[0].arn
+}
+
+# Application log group fed by the Fluent Bit DaemonSet (amazon-cloudwatch-observability
+# add-on). The greeter writes JSON to stdout (log/slog) which Fluent Bit ships here.
+# See README "Observability".
+resource "aws_cloudwatch_log_group" "greeter" {
+  count             = var.create ? 1 : 0
+  name              = "/aws/eks/${local.cluster_name}/application/greeter"
+  retention_in_days = 14
+}
+
+# Downtime alarm reads Container Insights metric pod_number_of_running_containers
+# for the greeter namespace. Notification actions are intentionally unwired - the
+# alarm definition itself is the showcase artifact; SNS wiring is documented in
+# the README as the production path.
+resource "aws_cloudwatch_metric_alarm" "greeter_downtime" {
+  count               = var.create ? 1 : 0
+  alarm_name          = "${module.label.id}-greeter-downtime"
+  alarm_description   = "Greeter has <1 running container in namespace 'greeter' for 2 minutes. Wire SNS to enable notifications."
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  namespace           = "ContainerInsights"
+  metric_name         = "pod_number_of_running_containers"
+  treat_missing_data  = "breaching"
+  dimensions = {
+    Namespace   = "greeter"
+    ClusterName = local.cluster_name
+  }
 }
 
 resource "aws_iam_role" "cluster_admin" {

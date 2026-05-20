@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -120,6 +122,55 @@ func TestGetIPFromRequestFallsBackToRemoteAddr(t *testing.T) {
 	req.RemoteAddr = "127.0.0.1:1234"
 	if got, want := GetIPFromRequest(req), "127.0.0.1:1234"; got != want {
 		t.Fatalf("GetIPFromRequest = %q, want %q", got, want)
+	}
+}
+
+func TestSlogProducesJSON(t *testing.T) {
+	var buf bytes.Buffer
+	prev := logger
+	logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	t.Cleanup(func() { logger = prev })
+
+	logger.Info("greeting_served",
+		slog.String("client_ip", "10.0.0.1"),
+		slog.String("pod", "greeter-test"),
+	)
+
+	var entry map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &entry); err != nil {
+		t.Fatalf("log line is not valid JSON: %v\n%s", err, buf.String())
+	}
+	for _, key := range []string{"time", "level", "msg", "client_ip", "pod"} {
+		if _, ok := entry[key]; !ok {
+			t.Errorf("missing key %q in log entry: %v", key, entry)
+		}
+	}
+	if entry["msg"] != "greeting_served" {
+		t.Errorf("expected msg=greeting_served, got %v", entry["msg"])
+	}
+}
+
+func TestHelloServerEmitsStructuredLog(t *testing.T) {
+	t.Setenv("HOSTNAME", "local")
+	var buf bytes.Buffer
+	prev := logger
+	logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	t.Cleanup(func() { logger = prev })
+
+	_ = serveHello(t, "/")
+
+	var entry map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &entry); err != nil {
+		t.Fatalf("HelloServer did not emit valid JSON: %v\n%s", err, buf.String())
+	}
+	if entry["msg"] != "greeting_served" {
+		t.Errorf("expected msg=greeting_served, got %v", entry["msg"])
+	}
+	if entry["client_ip"] != "127.0.0.1:1234" {
+		t.Errorf("expected client_ip=127.0.0.1:1234, got %v", entry["client_ip"])
+	}
+	if entry["pod"] != "local" {
+		t.Errorf("expected pod=local, got %v", entry["pod"])
 	}
 }
 

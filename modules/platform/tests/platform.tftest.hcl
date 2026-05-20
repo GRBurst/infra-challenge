@@ -149,3 +149,23 @@ run "cluster_admin_role_not_created_when_create_false" {
     error_message = "cluster_admin IAM role must not be created when create=false."
   }
 }
+
+run "observability_resources_not_created_when_create_false" {
+  command = plan
+  assert {
+    condition     = length(aws_cloudwatch_log_group.greeter) == 0
+    error_message = "log group must not be created when create=false."
+  }
+  assert {
+    condition     = length(aws_cloudwatch_metric_alarm.greeter_downtime) == 0
+    error_message = "downtime alarm must not be created when create=false."
+  }
+  assert {
+    condition     = length(aws_iam_role.cloudwatch_observability) == 0
+    error_message = "cloudwatch observability IAM role must not be created when create=false."
+  }
+  assert {
+    condition     = length(aws_eks_pod_identity_association.cloudwatch_observability) == 0
+    error_message = "pod identity association must not be created when create=false."
+  }
+}

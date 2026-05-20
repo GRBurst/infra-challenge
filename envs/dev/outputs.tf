@@ -33,3 +33,13 @@ output "greeter_namespace" {
 output "cluster_admin_role_arn" {
   value = module.platform.cluster_admin_role_arn
 }
+
+output "greeter_log_group" {
+  value       = module.platform.greeter_log_group
+  description = "CloudWatch Logs group for greeter application logs (populated by the Fluent Bit DaemonSet)."
+}
+
+output "greeter_alarm_name" {
+  value       = module.platform.greeter_alarm_name
+  description = "CloudWatch alarm that fires when the greeter has <1 running container for 2 minutes."
+}

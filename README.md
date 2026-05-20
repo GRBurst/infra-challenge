@@ -16,6 +16,20 @@ deployed via ArgoCD, built by GitHub Actions with Nix, with state in S3.
 
 ______________________________________________________________________
 
+In this challenge, I setup 2 things that are more of a bonus than something that
+is really required for a minmal setup:
+
+1. Local setup. While this is nice to have, it would require more than necessary
+   effort to set this up when starting from scratch without previous experience.
+   If I wouldn't have a skeleton in place already, this would be the first thing
+   to exclude in the solution.
+2. ArgoCD. In a minimal setup, ArgoCD is not really needed. I my opinion, this
+   get's more useful in complex setups and is good to have early, but not really
+   a requirement (you could just deploy from github action). It especially
+   shines when you have different teams, e.g. an infrastructure and an
+   application team, where you need some kind of separation contract for the
+   infructure plan and app plane.
+
 ## Prerequisites
 
 All tools are provided by the [Nix](https://nixos.org/) dev shell. With Nix
@@ -330,19 +344,98 @@ as a simpler alternative.
 
 ______________________________________________________________________
 
+## Observability
+
+The greeter service emits structured JSON logs and is monitored end-to-end on
+AWS-native services. Scope is deliberately narrow - see the production paths
+below.
+
+### Logging pipeline
+
+1. Greeter writes one-line JSON via `log/slog` to stdout. Each line carries
+   `time`, `level`, `msg`, plus structured fields like `client_ip` and `pod`.
+
+2. The EKS managed add-on `amazon-cloudwatch-observability` runs Fluent Bit as a
+   DaemonSet and forwards container stdout to CloudWatch Logs at
+   `/aws/eks/<cluster>/application/greeter` (14-day retention).
+
+3. Query in CloudWatch Logs Insights:
+
+   ```
+   fields @timestamp, msg, client_ip, pod
+   | sort @timestamp desc
+   | limit 100
+   ```
+
+### Alerting
+
+CloudWatch alarm `hm-dev-greeter-downtime` watches the Container Insights metric
+`pod_number_of_running_containers` for the `greeter` namespace. It fires when
+fewer than one container is running for two consecutive minutes
+(`treat_missing_data = "breaching"`).
+
+The alarm has **no notification actions wired** - by design, to keep the demo
+small. The alarm is visible in the CloudWatch console and via:
+
+```sh
+aws cloudwatch describe-alarms --alarm-names hm-dev-greeter-downtime
+```
+
+### Production path - wiring real notifications
+
+CloudWatch alarms cannot send notifications on their own; they emit to
+"actions". The canonical fan-out is SNS. To enable email / Slack / PagerDuty:
+
+```hcl
+resource "aws_sns_topic" "alerts" {
+  name              = "hm-dev-greeter-alerts"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = "sre@example.com"
+}
+
+# then on the alarm in envs/dev/main.tf:
+#   alarm_actions = [aws_sns_topic.alerts.arn]
+#   ok_actions    = [aws_sns_topic.alerts.arn]
+```
+
+### Production path - full observability
+
+For real production:
+
+- **Metrics**: Prometheus (`kube-prometheus-stack`) or AWS Managed Prometheus.
+  Greeter exposes `/metrics` via `prometheus/client_golang` with RED metrics
+  (rate, errors, duration histogram), scraped by a `ServiceMonitor`.
+- **Dashboards & alerting**: Grafana + AlertManager, or AWS Managed Grafana +
+  AMP + EventBridge → PagerDuty/Slack.
+- **Tracing**: AWS Distro for OpenTelemetry (ADOT) collector + AWS X-Ray, or
+  OTel → Tempo/Jaeger.
+- **Logs at scale**: Loki, or CloudWatch Logs with metric filters and
+  Logs-to-Metrics pipelines.
+- **Tighter IAM**: replace node-role policy attachment with IRSA per service
+  account for the CloudWatch agent.
+- **Per-request logging**: add HTTP middleware around the mux to log `method`,
+  `path`, `status`, `duration_ms` for every request.
+
+______________________________________________________________________
+
 ## Tradeoffs and limitations
 
 Conscious scope decisions made for this challenge. Each has a documented
 production path.
 
 | Limitation | Reason | Production path |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HTTP-only on port 8080 (no TLS) | No ACM certificate provisioned | ACM + ALB Ingress Controller + port 443 |
 | Single NAT Gateway | 3x cost for HA; acceptable for a challenge | `single_nat_gateway = false` in the VPC module |
 | Trivy scan is non-blocking | Nix base image has unfixed upstream CVEs the app cannot patch | Pin `nixpkgs` revision, strip unused packages, re-enable `--exit-code 1` |
 | ArgoCD UI not publicly exposed | Requires ALB + ACM + DNS. port-forward access sufficient for demo. Different story for self-hosted git services (e.g. gitlab, gitea). | ALB Ingress + ACM + Dex (GitHub SSO) |
 | ArgoCD polls every 3 min (no webhooks) | Webhooks require a public ArgoCD endpoint | GitHub webhook → `argocd.server.service.type=LoadBalancer` |
-| No Prometheus / Grafana | Full observability stack is out of scope | CloudWatch Container Insights or ADOT for K8s metrics |
+| Basic CloudWatch observability only - no Prometheus / Grafana, no SNS wiring on the alarm | "Showcase" scope: structured logs + log shipping + downtime alarm is enough to demonstrate the pipeline. Full stack is operational overhead beyond a take-home. | See the [Observability](#observability) section. Add SNS subscriptions; install `kube-prometheus-stack` or AMP+AMG; add ADOT for tracing. |
 | No image signing | Key management overhead not justified here | cosign + ECR + OPA/Gatekeeper admission policy |
 | No network policies | Service mesh adds complexity with no app-level benefit yet | Calico or Cilium network policies per namespace |
 | No IAM Roles for SA for the greeter | Greeter has no AWS API dependency | Add `aws_iam_role.greeter_irsa` in `modules/platform` when an AWS SDK call is needed |
