@@ -37,6 +37,18 @@ commands. This is heavily used to centralize all scripting parts.
 > work and a flake support enabled, see
 > [Flakes](https://nixos.wiki/wiki/flakes).
 
+### Quick app test (no infrastructure)
+
+The same `flake.nix` that provides the dev shell also builds the greeter binary
+and the Docker image published by CI:
+
+```sh
+nix build                              # → ./result/bin/greeter
+HELLO_TAG=test HOSTNAME=local nix run  # runs the service on :8080
+nix build .#dockerImage                # → OCI tarball; load with: docker load -i result
+nix flake check                        # verifies both artifacts build cleanly
+```
+
 ______________________________________________________________________
 
 ## Repository layout
