@@ -17,7 +17,7 @@ deployed via ArgoCD, built by GitHub Actions with Nix, with state in S3.
 ______________________________________________________________________
 
 In this challenge, I setup 2 things that are more of a bonus than something that
-is really required for a minmal setup:
+is really required for a minimal setup:
 
 1. Local setup. While this is nice to have, it would require more than necessary
    effort to set this up when starting from scratch without previous experience.
@@ -28,7 +28,7 @@ is really required for a minmal setup:
    a requirement (you could just deploy from github action). It especially
    shines when you have different teams, e.g. an infrastructure and an
    application team, where you need some kind of separation contract for the
-   infructure plan and app plane.
+   infrastructure plan and app plane.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ nix develop
 This drops you into a shell with: `opentofu`, `just`, `kubectl`, `helm`, `k3d`,
 `awscli2`, `trivy` (let's hope they have better supply chain measures in place
 now :-) ), `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters. No manual
-installs required. These are many tools for a simple demo, but I mostly compied
+installs required. These are many tools for a simple demo, but I mostly copied
 those from existing projects I setup and am working on.
 
 `just` is the task runner. Run `just` with no arguments to list all available
@@ -198,7 +198,7 @@ the `main` branch and CI takes over.
 
 ### CI/CD pipeline
 
-Every push to `main` runs four jobs:
+On every push, `check` runs. On `main`, all four jobs run:
 
 | Job | Triggered by | What it does |
 | ----------------- | ---------------------------- | ----------------------------------------------------------------------- |
@@ -220,14 +220,12 @@ out the new pods. The `[skip ci]` marker on that commit prevents a loop
 
 ### Accessing the cluster (kubectl)
 
-After bootstrap, use the cluster-admin role output:
+After bootstrap, use the justfile shortcut (reads cluster name and role ARN
+dynamically from `tofu output`, adds a short alias, cleans up duplicate
+contexts):
 
 ```sh
-aws eks update-kubeconfig \
-  --name hm-dev-eks \
-  --region eu-central-1 \
-  --role-arn "$(cd envs/dev && tofu output -raw cluster_admin_role_arn)"
-
+just dev-kubeconfig
 kubectl get nodes
 kubectl get pods -n greeter
 ```

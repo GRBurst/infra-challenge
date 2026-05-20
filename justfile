@@ -390,10 +390,6 @@ dev-kubeconfig:
     --region eu-central-1 \
     --role-arn "$ROLE_ARN" \
     --alias "$CLUSTER"
-  # Remove any auto-generated ARN-form duplicate context for the same cluster
-  kubectl config get-contexts -o name 2>/dev/null \
-    | grep "^arn:aws:eks:.*:cluster/${CLUSTER}$" \
-    | xargs -r -I{} kubectl config delete-context "{}"
   echo "==> kubectl context '${CLUSTER}' configured (assumes ${ROLE_ARN})"
 
 # Full teardown (destroy in reverse: gitops → platform → bootstrap)
