@@ -26,9 +26,10 @@ nix develop
 ```
 
 This drops you into a shell with: `opentofu`, `just`, `kubectl`, `helm`, `k3d`,
-`awscli2`, `trivy` (let's hope they have better supply chain measures in place now :-) ), `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters. No
-manual installs required. These are many tools for a simple demo, but I mostly
-compied those from existing projects I setup and am working on.
+`awscli2`, `trivy` (let's hope they have better supply chain measures in place
+now :-) ), `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters. No manual
+installs required. These are many tools for a simple demo, but I mostly compied
+those from existing projects I setup and am working on.
 
 `just` is the task runner. Run `just` with no arguments to list all available
 commands. This is heavily used to centralize all scripting parts.
@@ -191,7 +192,8 @@ Authentication is OIDC-based - no IAM keys are stored in GitHub Secrets.
 
 After `build-and-push` updates `charts/greeter/values-dev.yaml`, ArgoCD detects
 the commit within 3 minutes, renders the chart with the new image tag, and rolls
-out the new pods. The `[skip ci]` marker on that commit prevents a loop (workaround / simplification for this single repo setup).
+out the new pods. The `[skip ci]` marker on that commit prevents a loop
+(workaround / simplification for this single repo setup).
 
 ### Accessing the cluster (kubectl)
 

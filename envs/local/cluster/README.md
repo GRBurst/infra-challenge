@@ -1,7 +1,7 @@
 # Local Development with k3d
 
 Spin up a full offline GitOps stack (k3d + Gitea + ArgoCD + greeter) on your
-machine in ~2 minutes.
+machine in a few minutes.
 
 ## Prerequisites
 

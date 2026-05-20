@@ -9,6 +9,9 @@ resource "helm_release" "argocd" {
   version          = var.argocd_chart_version
   namespace        = var.argocd_namespace
   create_namespace = true
+  # Idempotent against state loss: uses `helm upgrade --install` so an existing
+  # release is treated as an upgrade rather than erroring with "name already in use".
+  upgrade_install = true
   values = [yamlencode({
     server = {
       extraArgs = ["--insecure"]
@@ -61,7 +64,7 @@ resource "kubernetes_manifest" "application" {
           valueFiles = [local.values_file]
           parameters = var.environment == "local" ? [
             { name = "helloTag", value = "$ARGOCD_APP_REVISION" }
-          ] : []
+          ] : null
         }
       }
       destination = {
