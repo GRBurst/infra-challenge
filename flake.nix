@@ -15,7 +15,7 @@
         pname = "greeter";
         version = "0.1.0";
 
-        src = ./.;
+        src = ./services/greeter;
 
         nativeBuildInputs = [ pkgs.go ];
 

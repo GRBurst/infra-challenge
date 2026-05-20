@@ -27,7 +27,7 @@ git checkout -b feature/demo-foo
 just dev-up                       # ArgoCD now tracks feature/demo-foo
 
 # edit + commit
-vim greeter.go
+vim services/greeter/greeter.go
 git commit -am "demo: change message"
 
 # push to in-cluster Gitea and force ArgoCD to refresh immediately

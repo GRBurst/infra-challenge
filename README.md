@@ -82,7 +82,7 @@ modules/
   platform/                Per-env: VPC, EKS, ECR, cluster-admin IAM role
   gitea/                   Gitea service for local git service setup
   gitops/                  ArgoCD Helm release + AppProject + Application CRs
-greeter.go                 Go service source
+services/greeter/          Go service source
 flake.nix                  Nix build + devShell definition
 justfile                   All task-runner commands
 ```
@@ -130,7 +130,7 @@ Once ready:
 ### Iterate on a change
 
 ```sh
-# Edit greeter.go or charts/greeter/...
+# Edit services/greeter/greeter.go or charts/greeter/...
 just dev-image          # rebuild + push image to local registry
 git add .               # or specify which files you want to commit
 git commit -m "my msg"
@@ -329,7 +329,7 @@ ______________________________________________________________________
 
 A typical change:
 
-1. Edit `greeter.go`, `charts/greeter/`, or infrastructure modules.
+1. Edit `services/greeter/greeter.go`, `charts/greeter/`, or infrastructure modules.
 2. `just check` - runs fmt + lint + validate + tflint locally.
 3. `just test-all` - full test suite (no network required; uses mock providers).
 4. Commit and push to `main`.

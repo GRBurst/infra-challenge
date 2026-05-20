@@ -186,7 +186,7 @@ test:
 
 # Run Go tests
 test-go:
-  GO111MODULE=off go test -v
+  GO111MODULE=off go test -v ./services/greeter/
 
 # Run Helm lint and unit tests
 test-chart:
