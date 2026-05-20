@@ -47,6 +47,12 @@ resource "kubernetes_manifest" "appproject" {
 
 resource "kubernetes_manifest" "application" {
   count = var.create_apps ? 1 : 0
+
+  # ArgoCD's CRD defaulting injects forceString into each parameter entry on
+  # every SSA dry-run, causing perpetual drift. Marking as computed tells the
+  # provider to ignore server-side normalization of this field.
+  computed_fields = ["spec.source.helm.parameters"]
+
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
