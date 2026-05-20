@@ -1,5 +1,6 @@
 # Action versions pinned to commit SHAs for supply-chain integrity.
-# Update via: curl -sL "https://api.github.com/repos/<owner>/<repo>/git/ref/tags/<version>" | jq -r .object.sha
+# Update via `pinact` tool, which basically does the same as running curl and adding the sha
+# curl -sL "https://api.github.com/repos/<owner>/<repo>/git/ref/tags/<version>" | jq -r .object.sha
 name: ci
 on:
   push:

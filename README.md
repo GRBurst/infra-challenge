@@ -26,7 +26,7 @@ nix develop
 ```
 
 This drops you into a shell with: `opentofu`, `just`, `kubectl`, `helm`, `k3d`,
-`awscli2`, `trivy`, `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters. No
+`awscli2`, `trivy` (let's hope they have better supply chain measures in place now :-) ), `tflint`, `jq`, `yq`, `k9s`, and all formatters/linters. No
 manual installs required. These are many tools for a simple demo, but I mostly
 compied those from existing projects I setup and am working on.
 
@@ -170,13 +170,15 @@ Every push to `challenge` runs four jobs:
 | `deploy-platform` | `challenge` (after check) | `tofu apply` for bootstrap + platform modules |
 | `deploy-gitops` | `challenge` (after platform) | two-phase apply: ArgoCD Helm release, then Application CRs |
 
+Runs on ubuntu latest with nix.
+
 Authentication is OIDC-based — no IAM keys are stored in GitHub Secrets.
 `build-and-push` uses `ci_app_role` (ECR push only); the deploy jobs use
 `ci_infra_role` (scoped to `environment: dev`).
 
 After `build-and-push` updates `charts/greeter/values-dev.yaml`, ArgoCD detects
 the commit within 3 minutes, renders the chart with the new image tag, and rolls
-out the new pods. The `[skip ci]` marker on that commit prevents a loop.
+out the new pods. The `[skip ci]` marker on that commit prevents a loop (workaround / simplification for this single repo setup).
 
 ### Accessing the cluster (kubectl)
 
