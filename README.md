@@ -28,12 +28,12 @@ is really required for a minimal setup:
    a requirement (you could just deploy from github action). It especially
    shines when you have different teams, e.g. an infrastructure and an
    application team, where you need some kind of separation contract for the
-   infrastructure plan and app plane.
+   infrastructure plane and app plane.
 
 ## Prerequisites
 
-All tools are provided by the [Nix](https://nixos.org/) dev shell. With Nix
-installed and git initialized (see Note), run:
+All tools are provided by the [Nix](https://nixos.org/download/) dev shell. With
+Nix installed and git initialized (see Note below), run:
 
 ```sh
 nix develop
@@ -52,6 +52,9 @@ commands. This is heavily used to centralize all scripting parts.
 > work and a flake support enabled, see
 > [Flakes](https://nixos.wiki/wiki/flakes). A simple git init and a potential
 > first init commit should suffice.
+
+> Note 2: [Direnv](https://direnv.net/) with an .envrc is also provided. If you
+> are familiar with it, the setup should create a nix shell automatically.
 
 ### Quick app test (no infrastructure)
 
@@ -99,9 +102,8 @@ ______________________________________________________________________
 ## Local development (k3d)
 
 The local environment runs a full GitOps loop - Gitea (self-hosted Git) + ArgoCD
-
-- inside a k3d cluster. ArgoCD watches a local mirror of the current branch, so
-  pushes to Gitea trigger resyncs without touching GitHub.
+inside a k3d cluster. ArgoCD watches a local mirror of the current branch, so
+pushes to Gitea trigger resyncs without touching GitHub.
 
 Although not required, I had some skeleton from a previous project already in
 place which I extended for a playground. It is generally nice to to have a local
@@ -122,10 +124,10 @@ repo, and applies the ArgoCD Application CR. Takes a few minutes on first run.
 Once ready:
 
 | Service | URL | Credentials |
-| ------- | -------------------------------------------------- | ------------------------------------------------ |
+| ------- | ----------------------------------------------------------------------- | ------------------------------------------------ |
 | Greeter | <http://localhost:8081/> | --- |
 | Gitea | <http://localhost:3000> | gitea-admin / gitea-admin (hardcoded local-only) |
-| ArgoCD | run `just argocd-ui`, then <http://localhost:8080> | admin / (printed by command) |
+| ArgoCD | run `just argocd-ui` for instruction, access at <http://localhost:8080> | admin / (printed by command) |
 
 ### Iterate on a change
 
@@ -168,8 +170,8 @@ eval "$(aws configure export-credentials --format env)"
 
 Why this `eval` workaround? Simply put: `aws login` creates modern, temporary
 credentials with OAuth cached. OpenTofu's backend engine for the state does not
-understand this yet. I was surprised by this myself. When using `aws sso login`,
-you might not run into this limitation.
+understand this yet. I was surprised by this myself. When provided with a sso
+setup and using `aws sso login`, you might not run into this limitation.
 
 **2. Provision infrastructure**
 
@@ -198,10 +200,10 @@ the `main` branch and CI takes over.
 
 ### CI/CD pipeline
 
-On every push, `check` runs. On `main`, all four jobs run:
+On every push, `check` runs. On `main` (configurable), all four jobs run:
 
 | Job | Triggered by | What it does |
-| ----------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| ----------------- | ----------------------- | ----------------------------------------------------------------------- |
 | `check` | all branches | fmt, lint, tflint, security scan, OpenTofu + Helm + Go tests |
 | `build-and-push` | `main` branch | Nix build → Trivy scan → push to ECR → commit updated `values-dev.yaml` |
 | `deploy-platform` | `main` (after check) | `tofu apply` for bootstrap + platform modules |
@@ -214,15 +216,14 @@ Authentication is OIDC-based - no IAM keys are stored in GitHub Secrets.
 `ci_infra_role` (scoped to `environment: dev`).
 
 After `build-and-push` updates `charts/greeter/values-dev.yaml`, ArgoCD detects
-the commit within 3 minutes, renders the chart with the new image tag, and rolls
-out the new pods. The `[skip ci]` marker on that commit prevents a loop
-(workaround / simplification for this single repo setup).
+the commit within 3 minutes (configuration), renders the chart with the new
+image tag, and rolls out the new pods. The `[skip ci]` marker on that commit
+prevents a loop (workaround / simplification for this single repo setup).
 
 ### Accessing the cluster (kubectl)
 
 After bootstrap, use the justfile shortcut (reads cluster name and role ARN
-dynamically from `tofu output`, adds a short alias, cleans up duplicate
-contexts):
+dynamically from `tofu output` and adds a short alias):
 
 ```sh
 just dev-kubeconfig
@@ -238,17 +239,22 @@ entry, independent of who ran `tofu apply`.
 Two stable IAM roles are created by the platform module for human access:
 
 | Role | Who can assume it | Purpose |
-| --- | --- | --- |
+| ------------------------- | -------------------------------------------------------- | ------------------------------------------------- |
 | `{cluster}-cluster-admin` | Principals in `cluster_admin_arns` + `ci_infra_role_arn` | `kubectl` access and AWS console resource viewing |
 | `{cluster}-console-admin` | Principals in `console_admin_arns` | AWS console resource viewing |
 
 Both roles have:
 
-- **IAM**: `eks:AccessKubernetesApi` and supporting EKS/IAM/SSM read actions required for the console Resources tab
-- **IAM**: `AmazonEC2ReadOnlyAccess` so the console can show node instance details
-- **Kubernetes**: EKS access entry associated with `AmazonEKSClusterAdminPolicy` (cluster-admin equivalent)
+- **IAM**: `eks:AccessKubernetesApi` and supporting EKS/IAM/SSM read actions
+  required for the console Resources tab
+- **IAM**: `AmazonEC2ReadOnlyAccess` so the console can show node instance
+  details
+- **Kubernetes**: EKS access entry associated with `AmazonEKSClusterAdminPolicy`
+  (cluster-admin equivalent)
 
-To view Kubernetes resources in the AWS console, switch to the `{cluster}-cluster-admin` role in the console role switcher, then navigate to **EKS → cluster → Resources**.
+To view Kubernetes resources in the AWS console, switch to the
+`{cluster}-cluster-admin` role in the console role switcher, then navigate to
+**EKS → cluster → Resources**.
 
 ### ArgoCD
 
@@ -329,7 +335,8 @@ ______________________________________________________________________
 
 A typical change:
 
-1. Edit `services/greeter/greeter.go`, `charts/greeter/`, or infrastructure modules.
+1. Edit `services/greeter/greeter.go`, `charts/greeter/`, or infrastructure
+   modules.
 2. `just check` - runs fmt + lint + validate + tflint locally.
 3. `just test-all` - full test suite (no network required; uses mock providers).
 4. Commit and push to `main`.
@@ -348,17 +355,17 @@ github_repo, cluster_admin_arns) and the literal S3 bucket / DynamoDB table in
 `just dev-infra-up` and `just dev-gitops-up` from the new directory. Add a
 matching GitHub Environment with the role ARNs from `tofu output`. Each account
 needs its own OIDC provider - the `bootstrap` module provisions it. Gate prod
-with required reviewers in GitHub Settings → Environments so no push deploys to
+with required reviewers in GitHub Settings -> Environments so no push deploys to
 prod without approval.
 
 ### Making the repo private
 
 ArgoCD currently reads the public repo without credentials. When the repo goes
 private, create a Kubernetes Secret labeled
-`argocd.argoproj.io/secret-type=repository` and apply it out-of-band - never via
-OpenTofu, as credentials must not enter Tofu state. Use a GitHub App
-(recommended: short-lived tokens, automatic rotation) or a read-only Deploy Key
-as a simpler alternative.
+`argocd.argoproj.io/secret-type=repository` and apply it out-of-band or via a
+write only resource, as credentials should not enter Tofu state. Use a GitHub
+App (recommended: short-lived tokens, automatic rotation) or a read-only Deploy
+Key as a simpler alternative.
 
 ______________________________________________________________________
 
