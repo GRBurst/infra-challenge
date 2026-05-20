@@ -231,14 +231,14 @@ resource "aws_cloudwatch_log_group" "greeter" {
 resource "aws_cloudwatch_metric_alarm" "greeter_downtime" {
   count               = var.create ? 1 : 0
   alarm_name          = "${module.label.id}-greeter-downtime"
-  alarm_description   = "Greeter has <1 running container in namespace 'greeter' for 2 minutes. Wire SNS to enable notifications."
+  alarm_description   = "Greeter has <1 running pod in namespace 'greeter' for 2 minutes. Wire SNS to enable notifications."
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = 2
   period              = 60
-  statistic           = "Sum"
+  statistic           = "Average"
   threshold           = 1
   namespace           = "ContainerInsights"
-  metric_name         = "pod_number_of_running_containers"
+  metric_name         = "namespace_number_of_running_pods"
   treat_missing_data  = "breaching"
   dimensions = {
     Namespace   = "greeter"

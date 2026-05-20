@@ -388,8 +388,8 @@ below.
 ### Alerting
 
 CloudWatch alarm `hm-dev-greeter-downtime` watches the Container Insights metric
-`pod_number_of_running_containers` for the `greeter` namespace. It fires when
-fewer than one container is running for two consecutive minutes
+`namespace_number_of_running_pods` for the `greeter` namespace. It fires when
+fewer than one pod is running for two consecutive minutes
 (`treat_missing_data = "breaching"`).
 
 The alarm has **no notification actions wired** - by design, to keep the demo
