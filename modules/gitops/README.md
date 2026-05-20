@@ -2,7 +2,7 @@
 
 Installs ArgoCD via Helm and wires up an AppProject + Application for the greeter service.
 
-> This module is generated from `variables.tf` and `outputs.tf`; keep them in sync — `just test-all` enforces it.
+> This module is generated from `variables.tf` and `outputs.tf`; keep them in sync - `just test-all` enforces it.
 
 ## Usage
 

@@ -34,7 +34,7 @@ service:
     type: ClusterIP
 ingress:
   enabled: false
-# Sub-chart deps disabled — SQLite covers DB needs.
+# Sub-chart deps disabled - SQLite covers DB needs.
 postgresql-ha:
   enabled: false
 postgresql:

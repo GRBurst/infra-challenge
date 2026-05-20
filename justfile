@@ -1,4 +1,4 @@
-# justfile — OpenTofu infrastructure helper commands
+# justfile - OpenTofu infrastructure helper commands
 # Requires: https://github.com/casey/just
 
 set dotenv-load := false
@@ -177,7 +177,7 @@ test:
     module_dir=$(dirname "$tests_dir")
     echo "--- Testing $module_dir ---"
     if ! (cd "$module_dir" && tofu init -backend=false -input=false -no-color 2>&1); then
-      echo "SKIP: $module_dir (init failed — missing credentials or network access)"
+      echo "SKIP: $module_dir (init failed - missing credentials or network access)"
       continue
     fi
     (cd "$module_dir" && tofu test -no-color) || fail=1
@@ -235,7 +235,7 @@ dev-up:
   cd "{{repo_root}}/envs/local" && \
     tofu init && \
     tofu apply -auto-approve -var "greeter_branch=$branch" -var "create_apps=false"
-  # Assert Gitea is actually healthy before proceeding — fail loudly if not
+  # Assert Gitea is actually healthy before proceeding - fail loudly if not
   kubectl --context "$CTX" -n gitea rollout status deployment/gitea --timeout=300s
   kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
 
@@ -388,7 +388,7 @@ dev-kubeconfig:
   cd "{{repo_root}}/envs/dev"
   ROLE_ARN="$(tofu output -raw cluster_admin_role_arn)"
   CLUSTER="$(tofu output -raw cluster_name)"
-  [[ -n "$ROLE_ARN" ]] || { echo "ERROR: cluster_admin_role_arn is empty — run dev-infra-up first"; exit 1; }
+  [[ -n "$ROLE_ARN" ]] || { echo "ERROR: cluster_admin_role_arn is empty - run dev-infra-up first"; exit 1; }
   aws eks update-kubeconfig \
     --name "$CLUSTER" \
     --region eu-central-1 \

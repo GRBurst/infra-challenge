@@ -18,7 +18,7 @@ variable "github_repo" {
 
 variable "cluster_admin_arns" {
   type        = list(string)
-  description = "IAM principals granted cluster-admin via EKS access entries. Required — set in terraform.tfvars or via TF_VAR_cluster_admin_arns."
+  description = "IAM principals granted cluster-admin via EKS access entries. Required - set in terraform.tfvars or via TF_VAR_cluster_admin_arns."
   validation {
     condition = alltrue([
       for a in var.cluster_admin_arns :

@@ -57,7 +57,7 @@ ______________________________________________________________________
 .github/workflows/ci.yml   CI pipeline (check, build, deploy)
 charts/greeter/            Helm chart for the greeter service
   values.yaml              defaults
-  values-dev.yaml          dev overrides — image.tag, helloTag, buildTime (CI-managed)
+  values-dev.yaml          dev overrides - image.tag, helloTag, buildTime (CI-managed)
 envs/
   dev/                     AWS dev environment (OpenTofu root)
   local/                   Local k3d environment (OpenTofu root)
@@ -74,9 +74,10 @@ ______________________________________________________________________
 
 ## Local development (k3d)
 
-The local environment runs a full GitOps loop — Gitea (self-hosted Git) + ArgoCD
-— inside a k3d cluster. ArgoCD watches a local mirror of the current branch, so
-pushes to Gitea trigger resyncs without touching GitHub.
+The local environment runs a full GitOps loop - Gitea (self-hosted Git) + ArgoCD
+
+- inside a k3d cluster. ArgoCD watches a local mirror of the current branch, so
+  pushes to Gitea trigger resyncs without touching GitHub.
 
 Although not required, I had some skeleton from a previous project already in
 place which I extended for a playground. It is generally nice to to have a local
@@ -184,7 +185,7 @@ Every push to `challenge` runs four jobs:
 
 Runs on ubuntu latest with nix.
 
-Authentication is OIDC-based — no IAM keys are stored in GitHub Secrets.
+Authentication is OIDC-based - no IAM keys are stored in GitHub Secrets.
 `build-and-push` uses `ci_app_role` (ECR push only); the deploy jobs use
 `ci_infra_role` (scoped to `environment: dev`).
 
@@ -224,7 +225,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 ```
 
 ArgoCD polls the `challenge` branch of this repository every 3 minutes. The
-Application is configured with `automated.prune = true` and `selfHeal = true` —
+Application is configured with `automated.prune = true` and `selfHeal = true` -
 any drift is corrected automatically.
 
 ### Greeter endpoints
@@ -289,8 +290,8 @@ ______________________________________________________________________
 A typical change:
 
 1. Edit `greeter.go`, `charts/greeter/`, or infrastructure modules.
-2. `just check` — runs fmt + lint + validate + tflint locally.
-3. `just test-all` — full test suite (no network required; uses mock providers).
+2. `just check` - runs fmt + lint + validate + tflint locally.
+3. `just test-all` - full test suite (no network required; uses mock providers).
 4. Commit and push to `challenge`.
 5. CI runs `check`, then `build-and-push` (new image + updated
    `values-dev.yaml`).
@@ -304,7 +305,7 @@ Each environment lives in its own `envs/<env>/` directory and AWS account. Copy
 `envs/dev/`, update the account ID in `backend.tf` and `providers.tf`, run
 `just dev-infra-up` and `just dev-gitops-up` from the new directory, then add a
 matching GitHub Environment with the role ARNs from `tofu output`. Each account
-needs its own OIDC provider — the `bootstrap` module provisions it. Gate prod
+needs its own OIDC provider - the `bootstrap` module provisions it. Gate prod
 with required reviewers in GitHub Settings → Environments so no push deploys to
 prod without approval.
 
@@ -312,7 +313,7 @@ prod without approval.
 
 ArgoCD currently reads the public repo without credentials. When the repo goes
 private, create a Kubernetes Secret labeled
-`argocd.argoproj.io/secret-type=repository` and apply it out-of-band — never via
+`argocd.argoproj.io/secret-type=repository` and apply it out-of-band - never via
 OpenTofu, as credentials must not enter Tofu state. Use a GitHub App
 (recommended: short-lived tokens, automatic rotation) or a read-only Deploy Key
 as a simpler alternative.

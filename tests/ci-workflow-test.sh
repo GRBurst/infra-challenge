@@ -2,7 +2,7 @@
 # Structural contract test for .github/workflows/ci.yml.
 # Asserts the workflow shape: required jobs, dependencies, OIDC permissions,
 # environment scoping, role variable plumbing, and two-phase apply commands.
-# Pure static analysis via yq — no AWS, no GitHub, no network.
+# Pure static analysis via yq - no AWS, no GitHub, no network.
 #
 # Run via: nix develop --command bash tests/ci-workflow-test.sh
 set -euo pipefail
