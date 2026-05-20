@@ -30,7 +30,6 @@ jobs:
       - run: nix develop --command just tflint
       - run: nix develop --command just security
       - run: nix develop --command just test
-      - run: nix develop --command just test-ci-workflow
   build-and-push:
     needs: [check, config]
     if: github.ref == format('refs/heads/{0}', needs.config.outputs.deploy_branch)

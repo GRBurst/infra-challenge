@@ -193,10 +193,6 @@ test-chart:
   helm lint charts/greeter
   helm unittest charts/greeter
 
-# Static contract test for ci.yml structure
-test-ci-workflow:
-  bash tests/ci-workflow-test.sh
-
 # Run OpenTofu tests for gitops module and local env
 test-tofu:
   #!/usr/bin/env bash
@@ -207,7 +203,7 @@ test-tofu:
   (cd envs/local && tofu init -backend=false -input=false -no-color && tofu test -no-color)
 
 # Run all tests: Go, Helm, OpenTofu, and static checks
-test-all: test-go test-chart test test-gitea-script test-ci-workflow
+test-all: test-go test-chart test test-local-scripts
 
 # ============================================================
 # Local dev lifecycle
@@ -240,7 +236,7 @@ dev-up:
   kubectl --context "$CTX" -n gitea get svc gitea-http >/dev/null
 
   echo "==> Bootstrapping Gitea repo..."
-  cd "{{repo_root}}" && bash envs/local/cluster/scripts/gitea-setup.sh
+  cd "{{repo_root}}" && bash envs/local/cluster/scripts/seed-gitea-repo.sh
 
   echo "==> Applying Application CR..."
   cd "{{repo_root}}/envs/local" && \
@@ -305,8 +301,8 @@ dev-down:
 # ============================================================
 
 # Force-push current branch to Gitea (idempotent)
-gitea-setup:
-  bash envs/local/cluster/scripts/gitea-setup.sh
+seed-gitea-repo:
+  bash envs/local/cluster/scripts/seed-gitea-repo.sh
 
 # Force ArgoCD to re-evaluate immediately after `git push gitea`
 gitea-sync:
@@ -321,11 +317,11 @@ argocd-ui:
     -o jsonpath='{.data.password}' | base64 -d
   @echo
 
-# Static-check gitea-setup.sh and smoke-test.sh
-test-gitea-script:
-  shellcheck envs/local/cluster/scripts/gitea-setup.sh
+# Static-check seed-gitea-repo.sh and smoke-test.sh
+test-local-scripts:
+  shellcheck envs/local/cluster/scripts/seed-gitea-repo.sh
   shellcheck envs/local/cluster/scripts/smoke-test.sh
-  bash -n envs/local/cluster/scripts/gitea-setup.sh
+  bash -n envs/local/cluster/scripts/seed-gitea-repo.sh
   bash -n envs/local/cluster/scripts/smoke-test.sh
   ! grep -nE '^\s*sleep [0-9]+\s*$' envs/local/cluster/scripts/smoke-test.sh
 

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #
-# Idempotent local-Gitea bootstrap.
+# seed-gitea-repo.sh
+# Seeds the local Gitea instance with the current branch's contents. Idempotent.
 #   1. Wait for Gitea API.
 #   2. Ensure repo gitea-admin/infra-challenge exists.
 #   3. Force-push the current branch.
 #   4. Set Gitea default_branch = current branch.
+#
+# Not wrapped in `local-exec`: git-repo contents are not Terraform-managed
+# state, so this script runs as an explicit `just seed-gitea-repo` step.
 
 set -euo pipefail
 

@@ -123,7 +123,7 @@ Once ready:
 | Service | URL | Credentials |
 | ------- | -------------------------------------------------- | ---------------------------- |
 | Greeter | <http://localhost:8081/> | --- |
-| Gitea | <http://localhost:3000> | gitea-admin / gitea-admin |
+| Gitea | <http://localhost:3000> | gitea-admin / gitea-admin (hardcoded local-only) |
 | ArgoCD | run `just argocd-ui`, then <http://localhost:8080> | admin / (printed by command) |
 
 ### Iterate on a change
@@ -133,7 +133,7 @@ Once ready:
 just dev-image          # rebuild + push image to local registry
 git add .               # or specify which files you want to commit
 git commit -m "my msg"
-just gitea-setup        # force-push current branch to Gitea
+just seed-gitea-repo    # force-push current branch to Gitea
 just gitea-sync         # trigger immediate ArgoCD re-evaluation (you can wait for it to trigger automatically as well)
 just dev-check          # wait for rollout + assert Synced + Healthy
 ```
@@ -298,11 +298,11 @@ ______________________________________________________________________
 ## Testing
 
 ```sh
-just test-all           # Go + Helm + OpenTofu + shellcheck + CI workflow structure
+just test-all           # Go + Helm + OpenTofu + shellcheck
 just test-go            # Go unit tests
 just test-chart         # Helm lint + helm-unittest
 just test               # OpenTofu native tests for all modules and envs
-just test-ci-workflow   # Static assertions on ci.yml structure (yq-based)
+just test-local-scripts # shellcheck + bash -n for envs/local/cluster/scripts
 just dev-test           # Smoke tests against the local k3d cluster
 just dev-infra-smoke    # Smoke tests against the AWS dev environment
 ```
@@ -326,8 +326,10 @@ A typical change:
 ### Adding a new environment
 
 Each environment lives in its own `envs/<env>/` directory and AWS account. Copy
-`envs/dev/`, update the account ID in `backend.tf` and `providers.tf`, run
-`just dev-infra-up` and `just dev-gitops-up` from the new directory, then add a
+`envs/dev/`, update `terraform.tfvars` (namespace, environment, region,
+github_repo, cluster_admin_arns) and the literal S3 bucket / DynamoDB table in
+`backend.tf` (backend blocks cannot interpolate variables), then run
+`just dev-infra-up` and `just dev-gitops-up` from the new directory. Add a
 matching GitHub Environment with the role ARNs from `tofu output`. Each account
 needs its own OIDC provider - the `bootstrap` module provisions it. Gate prod
 with required reviewers in GitHub Settings → Environments so no push deploys to

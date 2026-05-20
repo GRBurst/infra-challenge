@@ -27,6 +27,10 @@ mock_provider "kubernetes" {}
 variables {
   create_platform    = false
   cluster_admin_arns = []
+  namespace          = "hm"
+  environment        = "dev"
+  region             = "eu-central-1"
+  github_repo        = "GRBurst/infra-challenge"
 }
 
 run "providers_cluster_name_matches_formula" {

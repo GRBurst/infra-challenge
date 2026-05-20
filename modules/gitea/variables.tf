@@ -21,18 +21,10 @@ variable "host_port" {
   default     = 3000
 }
 
-variable "admin_user" {
-  type        = string
-  description = "Gitea admin username. Mirrors gitea.admin.username in values."
-  default     = "gitea-admin"
-}
-
-variable "admin_password" {
-  type        = string
-  description = "Gitea admin password. Mirrors gitea.admin.password in values."
-  default     = "gitea-admin"
-  sensitive   = true
-}
+# Note: gitea admin credentials are intentionally NOT exposed as variables.
+# They are hardcoded to gitea-admin / gitea-admin in values.yaml and in the
+# push_url output. This module is local-only (k3d demo). Never deploy to a
+# real cluster.
 
 variable "repo_name" {
   type        = string

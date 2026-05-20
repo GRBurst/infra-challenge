@@ -1,6 +1,8 @@
 # Local dev only. Public, ephemeral, SQLite. NodePort for host access.
 gitea:
   admin:
+    # Hardcoded gitea-admin / gitea-admin: local-only demo (k3d).
+    # seed-gitea-repo.sh + outputs.tf push_url assume these values.
     username: gitea-admin
     password: gitea-admin
     email: gitea-admin@gitea.local

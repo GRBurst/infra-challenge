@@ -2,7 +2,7 @@ module "bootstrap" {
   source = "../../modules/bootstrap"
 
   namespace   = var.namespace
-  environment = "dev"
+  environment = var.environment
   github_repo = var.github_repo
 }
 
@@ -10,7 +10,7 @@ module "platform" {
   source = "../../modules/platform"
 
   namespace          = var.namespace
-  environment        = "dev"
+  environment        = var.environment
   create             = var.create_platform
   cluster_admin_arns = var.cluster_admin_arns
   console_admin_arns = var.console_admin_arns
@@ -20,7 +20,7 @@ module "platform" {
 module "gitops" {
   source = "../../modules/gitops"
 
-  environment     = "dev"
+  environment     = var.environment
   repo_url        = "https://github.com/${var.github_repo}.git"
   target_revision = var.target_revision
 

@@ -6,14 +6,26 @@ variable "create_platform" {
 
 variable "namespace" {
   type        = string
-  description = "Organization abbreviation."
-  default     = "hm"
+  description = "Organization abbreviation (Cloud Posse null-label namespace). Set in terraform.tfvars."
+}
+
+variable "environment" {
+  type        = string
+  description = "Environment label. Set in terraform.tfvars. Must equal 'dev' for this root module."
+  validation {
+    condition     = var.environment == "dev"
+    error_message = "envs/dev pins environment = \"dev\". Use a different env root for other environments."
+  }
+}
+
+variable "region" {
+  type        = string
+  description = "AWS region for all resources in this environment. Set in terraform.tfvars."
 }
 
 variable "github_repo" {
   type        = string
-  description = "GitHub repo in 'owner/name' form."
-  default     = "GRBurst/infra-challenge"
+  description = "GitHub repo in 'owner/name' form. Set in terraform.tfvars."
 }
 
 variable "cluster_admin_arns" {

@@ -31,7 +31,7 @@ vim greeter.go
 git commit -am "demo: change message"
 
 # push to in-cluster Gitea and force ArgoCD to refresh immediately
-just gitea-setup
+just seed-gitea-repo
 just gitea-sync
 just dev-test
 ```
@@ -72,7 +72,7 @@ This directory holds the **imperative shell** for the local environment:
 
 - `k3d-config.yaml` - k3d cluster spec (registry, port mappings, NodePort
   exposure for Gitea).
-- `scripts/gitea-setup.sh` - bootstraps the in-cluster Gitea repo and
+- `scripts/seed-gitea-repo.sh` - seeds the in-cluster Gitea repo and
   force-pushes the current branch.
 - `scripts/smoke-test.sh` - HTTP smoke tests against the deployed greeter.
 
@@ -89,7 +89,7 @@ calling `modules/gitea` and `modules/gitops`).
 | Port 3000 already in use | Edit `k3d-config.yaml` host port for the NodePort mapping |
 | Cluster context missing | Run `k3d kubeconfig get infra-challenge >> ~/.kube/config` |
 | Docker network issues | `docker network ls` - k3d creates `k3d-infra-challenge`; inspect if missing |
-| `gitea-setup` times out | `kubectl -n gitea get pods` - first image pull can be slow |
-| ArgoCD shows `repo not found` | Re-run `just gitea-setup`; check `kubectl -n gitea logs` |
-| Push rejected, "non-fast-forward" | `gitea-setup` force-pushes intentionally; this should not happen |
+| `seed-gitea-repo` times out | `kubectl -n gitea get pods` - first image pull can be slow |
+| ArgoCD shows `repo not found` | Re-run `just seed-gitea-repo`; check `kubectl -n gitea logs` |
+| Push rejected, "non-fast-forward" | `seed-gitea-repo` force-pushes intentionally; this should not happen |
 | Detached HEAD | `git checkout <branch>` before running `just dev-up` |
